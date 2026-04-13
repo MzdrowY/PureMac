@@ -1,8 +1,11 @@
 import SwiftUI
 
+
 struct CategoryDetailView: View {
     @EnvironmentObject var vm: AppViewModel
     let category: CleaningCategory
+
+    @State private var sortDescending: Bool = true
 
     var result: CategoryResult? {
         vm.categoryResults[category]
@@ -109,6 +112,14 @@ struct CategoryDetailView: View {
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.pmAccentLight)
                 .buttonStyle(.plain)
+
+                Button(action: { sortDescending.toggle() }) {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 14))
+                        .foregroundColor(.pmAccentLight)
+                }
+                .buttonStyle(.plain)
+                .help(sortDescending ? "Sorted: Largest First" : "Sorted: Smallest First")
             }
             .padding(.horizontal, 48)
             .padding(.vertical, 8)
@@ -119,7 +130,7 @@ struct CategoryDetailView: View {
 
             ScrollView {
                 LazyVStack(spacing: 4) {
-                    ForEach(result.items) { item in
+                    ForEach(sortedItems(result.items)) { item in
                         FileRow(item: item, color: category.color)
                     }
                 }
@@ -171,6 +182,12 @@ struct CategoryDetailView: View {
                 .foregroundColor(.pmTextMuted)
             Spacer()
         }
+    }
+
+    // MARK: - Sort
+
+    private func sortedItems(_ items: [CleanableItem]) -> [CleanableItem] {
+        items.sorted { sortDescending ? $0.size > $1.size : $0.size < $1.size }
     }
 
     // MARK: - Action Bar
