@@ -27,11 +27,21 @@ actor CleaningEngine {
             }
 
             do {
-                if fileManager.fileExists(atPath: item.path) {
-                    try fileManager.removeItem(atPath: item.path)
-                    result.freedSpace += item.size
-                    result.itemsCleaned += 1
+                let itemURL = URL(fileURLWithPath: item.path)
+                guard fileManager.fileExists(atPath: item.path) else { continue }
+
+                // Security: resolve symlinks and validate the real path
+                let resolved = itemURL.resolvingSymlinksInPath().path
+                guard isSafeToDelete(resolvedPath: resolved) else {
+                    let msg = "Skipped symlink or unsafe path: \(item.path) -> \(resolved)"
+                    Logger.shared.log(msg, level: .warning)
+                    result.errors.append(msg)
+                    continue
                 }
+
+                try fileManager.removeItem(atPath: item.path)
+                result.freedSpace += item.size
+                result.itemsCleaned += 1
             } catch {
                 result.errors.append("\(item.name): \(error.localizedDescription)")
             }
@@ -95,6 +105,38 @@ actor CleaningEngine {
     }
 
     // MARK: - Helpers
+
+    /// Validates that a resolved path is safe to delete.
+    /// Prevents symlink attacks where a link in ~/Library/Caches points to ~/.ssh or ~/Documents.
+    private func isSafeToDelete(resolvedPath: String) -> Bool {
+        let home = fileManager.homeDirectoryForCurrentUser.path
+        let allowedRoots = [
+            "\(home)/Library/Caches",
+            "\(home)/Library/Logs",
+            "\(home)/Library/Saved Application State",
+            "\(home)/Library/HTTPStorages",
+            "\(home)/Library/WebKit",
+            "\(home)/Library/Containers",
+            "\(home)/Library/Group Containers",
+            "\(home)/Library/Application Support",
+            "\(home)/Library/Preferences",
+            "\(home)/Library/LaunchAgents",
+            "\(home)/Library/Mail Downloads",
+            "\(home)/.Trash",
+            "\(home)/Downloads",
+            "\(home)/Documents",
+            "\(home)/Desktop",
+            "/Library/Caches",
+            "/Library/Logs",
+            "/private/var/log",
+            "/private/var/tmp",
+            "/tmp",
+        ]
+        // Reject if resolved path is not inside any allowed root
+        return allowedRoots.contains { root in
+            resolvedPath.hasPrefix(root)
+        }
+    }
 
     private func getCurrentFreeSpace() -> Int64 {
         do {

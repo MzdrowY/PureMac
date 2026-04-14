@@ -362,6 +362,13 @@ actor ScanEngine {
                 var isDir: ObjCBool = false
                 guard fileManager.fileExists(atPath: fullPath, isDirectory: &isDir) else { continue }
 
+                // Security: skip symlinks to prevent symlink-following attacks
+                if let attrs = try? fileManager.attributesOfItem(atPath: fullPath),
+                   let fileType = attrs[.type] as? FileAttributeType,
+                   fileType == .typeSymbolicLink {
+                    continue
+                }
+
                 if isDir.boolValue {
                     let size = directorySize(path: fullPath)
                     if size > 1024 { // Skip tiny entries
