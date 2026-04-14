@@ -100,7 +100,7 @@ actor ScanEngine {
         let cachePaths = [
             "\(home)/Library/Caches",
             "\(home)/Library/Caches/com.apple.Safari",
-            "\(home)/Library/Caches/Google/Chrome",
+            "\(home)/Library/Caches/Google",
             "\(home)/Library/Caches/Firefox",
             "\(home)/Library/Caches/com.spotify.client",
             "\(home)/Library/Caches/com.microsoft.VSCode",
