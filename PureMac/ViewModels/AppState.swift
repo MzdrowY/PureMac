@@ -41,6 +41,7 @@ final class AppState: ObservableObject {
     @Published var isSearchingOrphans: Bool = false
     @Published var isLoadingApps: Bool = false
     @Published var isScanningAppFiles: Bool = false
+    @Published var removalError: String?
 
     // MARK: - Services
 
@@ -114,19 +115,49 @@ final class AppState: ObservableObject {
     }
 
     func removeSelectedFiles() {
-        var errors: [String] = []
-        for url in selectedFiles {
-            do {
-                try FileManager.default.removeItem(at: url)
-            } catch {
-                errors.append("\(url.lastPathComponent): \(error.localizedDescription)")
-                Logger.shared.log("Failed to remove \(url.path): \(error.localizedDescription)", level: .error)
+        let urls = Array(selectedFiles)
+        removalError = nil
+        trashViaFinder(urls: urls) { [weak self] success in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                // Check which files were actually removed from disk
+                let removed = urls.filter { !FileManager.default.fileExists(atPath: $0.path) }
+                if !removed.isEmpty {
+                    self.discoveredFiles.removeAll { removed.contains($0) }
+                    self.selectedFiles.subtract(removed)
+                    Logger.shared.log("Removed \(removed.count) files", level: .info)
+                }
+                let failed = urls.count - removed.count
+                if failed > 0 {
+                    self.removalError = "\(failed) file\(failed == 1 ? "" : "s") could not be removed. Grant Full Disk Access in System Settings → Privacy & Security to allow PureMac to manage all files."
+                    Logger.shared.log("Failed to remove \(failed) files — likely missing FDA", level: .error)
+                }
             }
         }
-        discoveredFiles.removeAll { selectedFiles.contains($0) }
-        selectedFiles.removeAll()
-        if errors.isEmpty {
-            Logger.shared.log("Successfully removed all selected files", level: .info)
+    }
+
+    /// Uses Finder via AppleScript to move files to Trash.
+    /// This triggers the standard macOS authorization prompt for protected files.
+    private func trashViaFinder(urls: [URL], completion: @escaping (Bool) -> Void) {
+        let posixPaths = urls.map { "\"\($0.path)\"" }.joined(separator: ", ")
+        let script = """
+        tell application "Finder"
+            set theFiles to {}
+            repeat with p in {\(posixPaths)}
+                set end of theFiles to (POSIX file p as alias)
+            end repeat
+            delete theFiles
+        end tell
+        """
+        DispatchQueue.global(qos: .userInitiated).async {
+            let appleScript = NSAppleScript(source: script)
+            var errorInfo: NSDictionary?
+            appleScript?.executeAndReturnError(&errorInfo)
+            let success = errorInfo == nil
+            if let errorInfo {
+                Logger.shared.log("Finder trash error: \(errorInfo)", level: .error)
+            }
+            completion(success)
         }
     }
 

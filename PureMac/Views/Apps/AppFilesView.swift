@@ -91,6 +91,20 @@ struct AppFilesView: View {
                 .padding()
             }
         }
+        .alert("Removal Failed", isPresented: Binding(
+            get: { appState.removalError != nil },
+            set: { if !$0 { appState.removalError = nil } }
+        )) {
+            Button("Open System Settings") {
+                FullDiskAccessManager.shared.openFullDiskAccessSettings()
+                appState.removalError = nil
+            }
+            Button("OK", role: .cancel) {
+                appState.removalError = nil
+            }
+        } message: {
+            Text(appState.removalError ?? "")
+        }
     }
 
     private func fileSelectionBinding(for url: URL) -> Binding<Bool> {
@@ -113,9 +127,8 @@ struct AppFilesView: View {
     }
 
     private func removeSingleFile(_ url: URL) {
-        try? FileManager.default.removeItem(at: url)
-        appState.discoveredFiles.removeAll { $0 == url }
-        appState.selectedFiles.remove(url)
+        appState.selectedFiles = [url]
+        appState.removeSelectedFiles()
     }
 }
 
