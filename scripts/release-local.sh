@@ -3,15 +3,20 @@
 # Local mirror of .github/workflows/release.yml. Use for emergency hotfixes
 # when CI is unavailable. Requires:
 #   - Developer ID Application identity in your login keychain
-#   - APPLE_ID, APPLE_APP_PASSWORD env vars (or notarytool keychain profile)
+#   - notarytool keychain profile already stored, e.g.:
+#       xcrun notarytool store-credentials AC_NOTARY \
+#         --key ~/.appstoreconnect/private_keys/AuthKey_5G7R52L8RK.p8 \
+#         --key-id 5G7R52L8RK --issuer 5de3898a-cd31-4061-850f-ae17b389e46a
 #   - xcodegen + create-dmg installed (brew install xcodegen create-dmg)
 #
-# Usage: scripts/release-local.sh <version>
+# Usage: scripts/release-local.sh <version> [notary_profile]
 #        scripts/release-local.sh 2.2.0
+#        scripts/release-local.sh 2.2.0 AC_NOTARY
 #
 set -euo pipefail
 
-VERSION="${1:?Usage: $0 <version>}"
+VERSION="${1:?Usage: $0 <version> [notary_profile]}"
+NOTARY_PROFILE="${2:-AC_NOTARY}"
 TEAM_ID="H3WXHVTP97"
 SIGN_ID="Developer ID Application: Moamen Basel (${TEAM_ID})"
 SCHEME="PureMac"
@@ -87,20 +92,16 @@ create-dmg \
   build/export/PureMac.app
 codesign --sign "${SIGN_ID}" --timestamp "${DMG}"
 
-echo "==> notarize app zip"
+echo "==> notarize app zip (profile: ${NOTARY_PROFILE})"
 ditto -c -k --keepParent --sequesterRsrc "${APP}" build/PureMac-app.zip
 xcrun notarytool submit build/PureMac-app.zip \
-  --apple-id "${APPLE_ID:?set APPLE_ID env var}" \
-  --password "${APPLE_APP_PASSWORD:?set APPLE_APP_PASSWORD env var}" \
-  --team-id "${TEAM_ID}" \
+  --keychain-profile "${NOTARY_PROFILE}" \
   --wait --timeout 30m
 xcrun stapler staple "${APP}"
 
 echo "==> notarize dmg"
 xcrun notarytool submit "${DMG}" \
-  --apple-id "${APPLE_ID}" \
-  --password "${APPLE_APP_PASSWORD}" \
-  --team-id "${TEAM_ID}" \
+  --keychain-profile "${NOTARY_PROFILE}" \
   --wait --timeout 30m
 xcrun stapler staple "${DMG}"
 xcrun stapler validate "${DMG}"
