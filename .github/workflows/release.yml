@@ -155,18 +155,28 @@ jobs:
           codesign --sign "Developer ID Application: Moamen Basel (H3WXHVTP97)" --timestamp "${DMG}"
           codesign --verify --verbose=2 "${DMG}"
 
+      - name: Write App Store Connect API key
+        env:
+          APP_STORE_CONNECT_PRIVATE_KEY: ${{ secrets.APP_STORE_CONNECT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          KEY_PATH="${RUNNER_TEMP}/asc_api_key.p8"
+          printf '%s' "${APP_STORE_CONNECT_PRIVATE_KEY}" > "${KEY_PATH}"
+          chmod 600 "${KEY_PATH}"
+          echo "ASC_KEY_PATH=${KEY_PATH}" >> "$GITHUB_ENV"
+
       - name: Notarize DMG
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
           DMG="build/PureMac-${VERSION}.dmg"
           xcrun notarytool submit "${DMG}" \
-            --apple-id "${APPLE_ID}" \
-            --password "${APPLE_APP_PASSWORD}" \
-            --team-id "${TEAM_ID}" \
+            --key "${ASC_KEY_PATH}" \
+            --key-id "${ASC_KEY_ID}" \
+            --issuer "${ASC_ISSUER_ID}" \
             --wait \
             --timeout 30m
           xcrun stapler staple "${DMG}"
@@ -175,6 +185,8 @@ jobs:
 
       - name: Build notarized zip
         env:
+          ASC_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
           VERSION: ${{ steps.ver.outputs.version }}
         run: |
           set -euo pipefail
@@ -182,9 +194,9 @@ jobs:
           # Notarize the .app inside a zip too (homebrew cask uses zip)
           ditto -c -k --keepParent --sequesterRsrc build/export/PureMac.app build/PureMac-app.zip
           xcrun notarytool submit build/PureMac-app.zip \
-            --apple-id "${{ secrets.APPLE_ID }}" \
-            --password "${{ secrets.APPLE_APP_PASSWORD }}" \
-            --team-id "${TEAM_ID}" \
+            --key "${ASC_KEY_PATH}" \
+            --key-id "${ASC_KEY_ID}" \
+            --issuer "${ASC_ISSUER_ID}" \
             --wait --timeout 30m
           xcrun stapler staple build/export/PureMac.app
           # Final shippable zip with stapled ticket
@@ -306,6 +318,8 @@ jobs:
             git push origin HEAD
           fi
 
-      - name: Cleanup keychain
+      - name: Cleanup keychain + ASC key
         if: always()
-        run: security delete-keychain "${RUNNER_TEMP}/app-signing.keychain-db" || true
+        run: |
+          security delete-keychain "${RUNNER_TEMP}/app-signing.keychain-db" || true
+          rm -f "${RUNNER_TEMP}/asc_api_key.p8" || true
