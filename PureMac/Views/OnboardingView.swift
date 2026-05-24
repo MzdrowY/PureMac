@@ -11,6 +11,7 @@ struct OnboardingView: View {
     @State private var appeared = false
     @State private var hasFda = false
     @State private var hasOpenedSettings = false
+    @State private var autoAdvanceScheduled = false
 
     private let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
@@ -169,10 +170,20 @@ struct OnboardingView: View {
             }
         }
         // Auto-advance once they grant access while on the permission page.
-        if granted, page == .permission {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                advance(by: 1)
+        // The autoAdvanceScheduled latch prevents the 1-second poll from
+        // queueing multiple .8s delays if grants are detected on back-to-back
+        // ticks before the page actually flips.
+        guard granted, page == .permission, !autoAdvanceScheduled else { return }
+        autoAdvanceScheduled = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+            // Re-check page in case the user manually advanced or backed up
+            // during the delay window.
+            guard page == .permission else {
+                autoAdvanceScheduled = false
+                return
             }
+            advance(by: 1)
+            autoAdvanceScheduled = false
         }
     }
 }

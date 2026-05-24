@@ -55,11 +55,21 @@ final class PermissionCoordinator: ObservableObject {
 
     /// Begin the request flow. `onGranted` fires exactly once when permission
     /// is detected, regardless of whether the sheet was open or already closed.
+    ///
+    /// Re-entrant: if a request is already in flight, the new context and
+    /// callback replace the previous ones (last writer wins) but the polling
+    /// timer is not duplicated. Prevents a rapid double-tap from spinning up
+    /// two Timers or leaking the first callback's captured state.
     func requestAccess(
         context: PromptContext = .general,
         failedPaths: [String] = [],
         onGranted: @escaping () -> Void
     ) {
+        // Drop the previous callback before installing the new one so its
+        // captured state can be released. Without this, a stuck first
+        // callback holds AppState slices we just superseded.
+        onGrantCallback = nil
+
         self.context = context
         self.failedItemPaths = failedPaths
         self.onGrantCallback = onGranted
@@ -75,6 +85,7 @@ final class PermissionCoordinator: ObservableObject {
         }
 
         isRequesting = true
+        // startPolling stops any existing timer first, so re-entry is safe.
         startPolling()
     }
 

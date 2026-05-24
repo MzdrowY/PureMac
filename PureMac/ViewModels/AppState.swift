@@ -550,20 +550,25 @@ final class AppState: ObservableObject {
     /// Request Full Disk Access via the rich PermissionCoordinator sheet and
     /// retry the supplied items once the user grants permission. Used by both
     /// the cleanup and app-uninstall flows so they share a single UI surface.
+    ///
+    /// The retry callback captures `items` directly rather than reading
+    /// `pendingPermissionRetryItems` at fire time — that field is mutable
+    /// app-wide and a second permission request would clobber it before the
+    /// first callback resolves, sending the wrong items to retryCleanItems.
     func requestFullDiskAccessAndRetry(items: [CleanableItem], context: PermissionCoordinator.PromptContext) {
         pendingPermissionRetryItems = items
+        let capturedItems = items
         PermissionCoordinator.shared.requestAccess(
             context: context,
             failedPaths: items.map { $0.path }
         ) { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                let pending = self.pendingPermissionRetryItems
                 self.pendingPermissionRetryItems = []
                 self.cleanError = nil
                 self.cleanErrorIsFDAFixable = false
-                guard !pending.isEmpty else { return }
-                await self.retryCleanItems(pending)
+                guard !capturedItems.isEmpty else { return }
+                await self.retryCleanItems(capturedItems)
             }
         }
     }
@@ -607,6 +612,12 @@ final class AppState: ObservableObject {
             }
         }
         totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
+
+        // Route survivors back through the same outcome path the original
+        // cleanup uses. Without this, an FDA revocation between grant and
+        // retry would silently drop errors instead of re-popping the sheet.
+        let survivors = items.filter { !result.cleanedPaths.contains($0.path) }
+        handleCleanOutcome(errors: result.errors, survivors: survivors)
 
         scanState = .cleaned
         loadDiskInfo()
