@@ -290,13 +290,21 @@ jobs:
           fi
 
       - name: Bump tap formula (momenbasel/homebrew-tap)
-        if: ${{ (github.event_name == 'push' || inputs.dry_run == false) && env.HOMEBREW_TAP_TOKEN != '' }}
+        # `env.HOMEBREW_TAP_TOKEN != ''` evaluated empty because env was
+        # step-scoped — referencing the secret directly works in step `if`
+        # per GitHub Actions docs. Also emits a loud warning when the secret
+        # is absent so future runs don't silently skip again.
+        if: ${{ github.event_name == 'push' || inputs.dry_run == false }}
         env:
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           VERSION: ${{ steps.ver.outputs.version }}
           ZIP_SHA: ${{ steps.sha.outputs.zip }}
         run: |
           set -euo pipefail
+          if [[ -z "${HOMEBREW_TAP_TOKEN:-}" ]]; then
+            echo "::warning title=Tap bump skipped::HOMEBREW_TAP_TOKEN secret is not set. Tap will stay at its previous version. Set the secret to enable auto-bumps."
+            exit 0
+          fi
           TAP_DIR="${RUNNER_TEMP}/homebrew-tap"
           git clone "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/momenbasel/homebrew-tap.git" "${TAP_DIR}"
           cd "${TAP_DIR}"
@@ -314,7 +322,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "No tap formula changes."
           else
-            git commit -m "puremac: bump to ${VERSION}"
+            git commit -m "puremac: bump to ${VERSION} (sha256 ${ZIP_SHA:0:12})"
             git push origin HEAD
           fi
 
