@@ -1,434 +1,411 @@
 import SwiftUI
 
+/// First-launch flow. Four scenes, large typography, plenty of breathing
+/// room. Sequence is welcome → mission → permission (with live demo) →
+/// ready. Skip is always available — we don't want to gate adoption on a
+/// reluctant user, but we do want to make the FDA step concrete enough that
+/// the people who *want* to grant it understand exactly what they're doing.
 struct OnboardingView: View {
     @Binding var isComplete: Bool
-    @State private var currentPage = 0
-    @State private var hasFullDiskAccess = false
+    @State private var page: Page = .welcome
     @State private var appeared = false
+    @State private var hasFda = false
     @State private var hasOpenedSettings = false
-    @State private var showDiagnostics = false
 
-    // Per-path access checks
-    @State private var accessResults: [ProtectedPath] = ProtectedPath.allPaths
+    private let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
-    private let timer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
+    enum Page: Int, CaseIterable {
+        case welcome, mission, permission, ready
+
+        var index: Int { rawValue }
+        static var count: Int { allCases.count }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Page content
-            Group {
-                switch currentPage {
-                case 0: welcomePage
-                case 1: fdaPage
-                case 2: readyPage
-                default: EmptyView()
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        ZStack {
+            backdrop
+                .ignoresSafeArea()
 
-            Divider()
+            VStack(spacing: 0) {
+                content
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding(.horizontal, 36)
+                    .padding(.top, 44)
+                    .padding(.bottom, 12)
+                    .id(page)
+                    .transition(
+                        .asymmetric(
+                            insertion: .opacity.combined(with: .move(edge: .trailing)),
+                            removal: .opacity.combined(with: .move(edge: .leading))
+                        )
+                    )
 
-            // Navigation
-            HStack {
-                if currentPage > 0 {
-                    Button("Back") {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            currentPage -= 1
-                        }
-                    }
-                    .transition(.opacity)
-                }
-
-                Spacer()
-
-                // Page dots
-                HStack(spacing: 8) {
-                    ForEach(0..<3, id: \.self) { i in
-                        Circle()
-                            .fill(i == currentPage ? Color.accentColor : Color.secondary.opacity(0.3))
-                            .frame(width: 8, height: 8)
-                            .scaleEffect(i == currentPage ? 1.2 : 1.0)
-                            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: currentPage)
-                    }
-                }
-
-                Spacer()
-
-                if currentPage < 2 {
-                    Button("Next") {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                            currentPage += 1
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                } else {
-                    Button("Get Started") { isComplete = true }
-                        .buttonStyle(.borderedProminent)
-                }
-            }
-            .padding()
-        }
-        .frame(width: 560, height: 460)
-        .onAppear {
-            withAnimation(.easeOut(duration: 0.6).delay(0.1)) {
-                appeared = true
+                bottomBar
             }
         }
-        .onReceive(timer) { _ in
-            if currentPage == 1 {
-                refreshAccessChecks()
-            }
-        }
-    }
-
-    // MARK: - Welcome
-
-    private var welcomePage: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            if let icon = NSImage(named: "AppIcon") {
-                Image(nsImage: icon)
-                    .resizable()
-                    .frame(width: 96, height: 96)
-                    .scaleEffect(appeared ? 1.0 : 0.5)
-                    .opacity(appeared ? 1 : 0)
-            }
-
-            VStack(spacing: 8) {
-                Text("Welcome to PureMac")
-                    .font(.largeTitle.bold())
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 10)
-
-                Text("Free, open-source macOS app manager and system cleaner.")
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .opacity(appeared ? 1 : 0)
-                    .offset(y: appeared ? 0 : 10)
-            }
-
-            HStack(spacing: 20) {
-                featureCard(
-                    icon: "magnifyingglass",
-                    title: "Smart Scan",
-                    desc: "Find junk files across your system",
-                    delay: 0.15
-                )
-                featureCard(
-                    icon: "trash",
-                    title: "App Uninstaller",
-                    desc: "Remove apps and all their files",
-                    delay: 0.25
-                )
-                featureCard(
-                    icon: "doc.questionmark",
-                    title: "Orphan Finder",
-                    desc: "Find leftovers from deleted apps",
-                    delay: 0.35
-                )
-            }
-            .padding(.top, 4)
-
-            Spacer()
-        }
-        .padding()
-        .transition(.asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .move(edge: .leading).combined(with: .opacity)
-        ))
-    }
-
-    private func featureCard(icon: String, title: LocalizedStringKey, desc: LocalizedStringKey, delay: Double) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundStyle(Color.accentColor)
-            Text(title)
-                .font(.callout.bold())
-            Text(desc)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(width: 140)
-        .opacity(appeared ? 1 : 0)
-        .offset(y: appeared ? 0 : 20)
-        .animation(.easeOut(duration: 0.5).delay(delay), value: appeared)
-    }
-
-    // MARK: - Full Disk Access
-
-    private var fdaPage: some View {
-        VStack(spacing: 14) {
-            Image(systemName: hasFullDiskAccess ? "checkmark.shield.fill" : "lock.shield")
-                .font(.system(size: 40))
-                .foregroundStyle(hasFullDiskAccess ? .green : .orange)
-                .animation(.easeInOut(duration: 0.3), value: hasFullDiskAccess)
-                .padding(.top, 8)
-
-            Text("Full Disk Access")
-                .font(.title2.bold())
-
-            if hasFullDiskAccess {
-                grantedView
-            } else if hasOpenedSettings {
-                instructionsView
-            } else {
-                introView
-            }
-
-            Spacer(minLength: 0)
-        }
-        .padding(.horizontal)
-        .padding(.bottom, 8)
+        .frame(width: 680, height: 560)
         .onAppear {
             FullDiskAccessManager.shared.triggerRegistration()
-            refreshAccessChecks()
+            withAnimation(.easeOut(duration: 0.5)) { appeared = true }
+            refreshFda()
         }
-        .onChange(of: hasFullDiskAccess) { granted in
-            if granted, currentPage == 1 {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                    withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                        currentPage = 2
-                    }
-                }
-            }
-        }
-        .transition(.asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .move(edge: .leading).combined(with: .opacity)
-        ))
-    }
-
-    private var introView: some View {
-        VStack(spacing: 12) {
-            Text("PureMac needs Full Disk Access to uninstall apps, find leftover files, and clean protected caches.")
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 420)
-
-            Button {
-                openSettingsAndAdvance()
-            } label: {
-                Label("Open System Settings", systemImage: "gear")
-                    .frame(minWidth: 200)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .keyboardShortcut(.defaultAction)
-            .padding(.top, 4)
-
-            Text("We'll guide you through the next steps.")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+        .onReceive(pollTimer) { _ in
+            if page == .permission { refreshFda() }
         }
     }
 
-    private var instructionsView: some View {
-        VStack(spacing: 10) {
-            Text("In System Settings, do this:")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+    @ViewBuilder
+    private var content: some View {
+        switch page {
+        case .welcome: WelcomeScene(appeared: appeared)
+        case .mission: MissionScene()
+        case .permission: PermissionScene(
+            hasFda: hasFda,
+            hasOpenedSettings: hasOpenedSettings,
+            openSettings: openSettings,
+            revealAppInFinder: { FullDiskAccessManager.shared.revealAppInFinder() }
+        )
+        case .ready: ReadyScene(hasFda: hasFda)
+        }
+    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                stepRow(number: 1, text: "Privacy & Security → Full Disk Access")
-                stepRow(number: 2, text: "Find **PureMac** and turn the toggle on")
-                stepRow(number: 3, text: "Authenticate with Touch ID or your password")
-            }
-            .frame(maxWidth: 420, alignment: .leading)
+    // MARK: - Background
 
-            HStack(spacing: 8) {
-                Button {
-                    FullDiskAccessManager.shared.openFullDiskAccessSettings()
-                } label: {
-                    Label("Reopen Settings", systemImage: "gear")
-                }
+    private var backdrop: some View {
+        ZStack {
+            Color(nsColor: .windowBackgroundColor)
+            // Radial wash that shifts hue per page. Subtle enough to read
+            // as ambient warmth rather than decoration.
+            RadialGradient(
+                colors: [pageTint.opacity(0.18), .clear],
+                center: .topTrailing,
+                startRadius: 60,
+                endRadius: 520
+            )
+            .animation(.easeInOut(duration: 0.6), value: page)
+        }
+    }
 
-                Menu {
-                    Button("PureMac isn't in the list — reveal it") {
-                        FullDiskAccessManager.shared.revealAppInFinder()
-                    }
-                    Button("Reset permissions and re-prompt") {
-                        _ = FullDiskAccessManager.shared.resetFullDiskAccess()
-                        FullDiskAccessManager.shared.triggerRegistration()
-                        refreshAccessChecks()
-                    }
-                    Divider()
-                    Button(LocalizedStringKey(showDiagnostics ? "Hide diagnostics" : "Show diagnostics")) {
-                        showDiagnostics.toggle()
-                    }
-                } label: {
-                    Label("Trouble?", systemImage: "questionmark.circle")
-                }
-                .menuStyle(.borderlessButton)
-                .fixedSize()
-            }
-            .padding(.top, 4)
+    private var pageTint: Color {
+        switch page {
+        case .welcome: return Tint.blue
+        case .mission: return Tint.purple
+        case .permission: return Tint.orange
+        case .ready: return Tint.green
+        }
+    }
 
-            HStack(spacing: 6) {
-                ProgressView().controlSize(.small)
-                Text("Waiting for permission…")
-                    .font(.caption)
+    // MARK: - Bottom bar
+
+    private var bottomBar: some View {
+        HStack {
+            if page != .welcome {
+                Button("Back") { advance(by: -1) }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.secondary)
+            } else {
+                Button("Skip") { isComplete = true }
+                    .buttonStyle(.plain)
                     .foregroundStyle(.secondary)
             }
-            .padding(.top, 2)
 
-            if showDiagnostics {
-                diagnosticsList
-            }
-        }
-    }
-
-    private var grantedView: some View {
-        VStack(spacing: 8) {
-            Text("Permission granted.")
-                .foregroundStyle(.green)
-                .font(.callout.weight(.semibold))
-            Text("PureMac can now manage protected files.")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-        .transition(.opacity.combined(with: .scale))
-    }
-
-    private func stepRow(number: Int, text: LocalizedStringKey) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 10) {
-            Text("\(number)")
-                .font(.callout.bold())
-                .foregroundStyle(.white)
-                .frame(width: 22, height: 22)
-                .background(Circle().fill(Color.accentColor))
-            Text(text)
-                .font(.callout)
             Spacer()
-        }
-    }
 
-    private var diagnosticsList: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            ForEach(accessResults) { path in
-                HStack(spacing: 8) {
-                    Image(systemName: path.accessible ? "checkmark.circle.fill" : "xmark.circle")
-                        .foregroundStyle(path.accessible ? .green : .red.opacity(0.7))
-                        .font(.system(size: 11))
-                    Image(systemName: path.icon)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 14)
-                    Text(LocalizedStringKey(path.label))
-                        .font(.caption)
-                    Spacer()
-                    Text(LocalizedStringKey(path.accessible ? "OK" : "Blocked"))
-                        .font(.caption2)
-                        .foregroundStyle(path.accessible ? .green : .orange)
+            HStack(spacing: 6) {
+                ForEach(Page.allCases, id: \.self) { p in
+                    Capsule()
+                        .fill(p == page ? Color.primary.opacity(0.75) : Color.primary.opacity(0.15))
+                        .frame(width: p == page ? 18 : 6, height: 6)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.85), value: page)
                 }
             }
+
+            Spacer()
+
+            if page == .ready {
+                Button("Start") { isComplete = true }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+            } else {
+                Button(page == .permission ? "Continue" : "Next") { advance(by: 1) }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+            }
         }
-        .frame(maxWidth: 360)
-        .padding(8)
-        .background(RoundedRectangle(cornerRadius: 6).fill(Color.secondary.opacity(0.08)))
+        .padding(.horizontal, 28)
+        .padding(.vertical, 16)
+        .background(
+            VStack(spacing: 0) {
+                Divider().opacity(0.5)
+                Color.clear
+            }
+        )
     }
 
-    private func openSettingsAndAdvance() {
+    // MARK: - Actions
+
+    private func advance(by delta: Int) {
+        let target = max(0, min(Page.count - 1, page.index + delta))
+        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+            page = Page(rawValue: target) ?? page
+        }
+    }
+
+    private func openSettings() {
         FullDiskAccessManager.shared.openFullDiskAccessSettings()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            FullDiskAccessManager.shared.revealAppInFinder()
+        }
         withAnimation(.easeInOut(duration: 0.25)) {
             hasOpenedSettings = true
         }
     }
 
-    // MARK: - Ready
-
-    private var readyPage: some View {
-        VStack(spacing: 20) {
-            Spacer()
-
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(.green)
-                .scaleEffect(appeared ? 1.0 : 0.3)
-                .animation(.spring(response: 0.5, dampingFraction: 0.6), value: currentPage)
-
-            Text("You're Ready")
-                .font(.title.bold())
-
-            // Summary of access
-            let granted = accessResults.filter(\.accessible).count
-            let total = accessResults.count
-
-            VStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Image(systemName: hasFullDiskAccess ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
-                        .foregroundStyle(hasFullDiskAccess ? .green : .orange)
-                    Text(grantedSummary(granted: granted, total: total))
-                        .foregroundStyle(.secondary)
-                }
-
-                if !hasFullDiskAccess {
-                    Text("Some features will be limited. You can grant Full Disk Access later in System Settings.")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: 360)
-                }
-            }
-
-            Spacer()
-        }
-        .padding()
-        .transition(.asymmetric(
-            insertion: .move(edge: .trailing).combined(with: .opacity),
-            removal: .move(edge: .leading).combined(with: .opacity)
-        ))
-    }
-
-    private func grantedSummary(granted: Int, total: Int) -> String {
-        String(
-            format: String(localized: "%lld/%lld protected locations accessible"),
-            Int64(granted),
-            Int64(total)
-        )
-    }
-
-    // MARK: - Permission Checking
-
-    private func refreshAccessChecks() {
-        for i in accessResults.indices {
-            let path = accessResults[i].path
-            let canAccess: Bool
-            if FileManager.default.fileExists(atPath: path) {
-                canAccess = FileManager.default.isReadableFile(atPath: path)
-            } else {
-                // Path doesn't exist on this system — not blocked, just absent
-                canAccess = true
-            }
-            if accessResults[i].accessible != canAccess {
-                withAnimation(.easeInOut(duration: 0.3)) {
-                    accessResults[i].accessible = canAccess
-                }
+    private func refreshFda() {
+        let granted = FullDiskAccessManager.shared.hasFullDiskAccess
+        if granted != hasFda {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                hasFda = granted
             }
         }
-        hasFullDiskAccess = accessResults.allSatisfy(\.accessible)
+        // Auto-advance once they grant access while on the permission page.
+        if granted, page == .permission {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                advance(by: 1)
+            }
+        }
     }
 }
 
-// MARK: - Protected Path Model
+// MARK: - Scenes
 
-struct ProtectedPath: Identifiable {
-    let id = UUID()
-    let label: String
-    let path: String
-    let icon: String
-    var accessible: Bool = false
+private struct WelcomeScene: View {
+    let appeared: Bool
+    @State private var bob = false
 
-    static var allPaths: [ProtectedPath] {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        return [
-            ProtectedPath(label: "Trash", path: "\(home)/.Trash", icon: "trash"),
-            ProtectedPath(label: "Mail Data", path: "\(home)/Library/Mail", icon: "envelope"),
-            ProtectedPath(label: "Safari Data", path: "\(home)/Library/Safari/Bookmarks.plist", icon: "safari"),
-            ProtectedPath(label: "Desktop", path: "\(home)/Desktop", icon: "menubar.dock.rectangle"),
-            ProtectedPath(label: "Documents", path: "\(home)/Documents", icon: "folder"),
-            ProtectedPath(label: "TCC Database", path: "/Library/Application Support/com.apple.TCC/TCC.db", icon: "lock.shield"),
-        ]
+    var body: some View {
+        VStack(spacing: 26) {
+            Spacer(minLength: 0)
+
+            ZStack {
+                if let icon = NSImage(named: "AppIcon") {
+                    Image(nsImage: icon)
+                        .resizable()
+                        .interpolation(.high)
+                        .frame(width: 120, height: 120)
+                        .shadow(color: .black.opacity(0.15), radius: 18, y: 8)
+                        .offset(y: bob ? -4 : 4)
+                        .onAppear {
+                            withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
+                                bob = true
+                            }
+                        }
+                } else {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 88, weight: .semibold))
+                        .foregroundStyle(Tint.blue)
+                }
+            }
+
+            VStack(spacing: 12) {
+                Text("Reclaim your Mac")
+                    .font(.system(size: 38, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                Text("Apple sells you small disks. We help you keep them clean.")
+                    .font(.system(size: 15))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+            }
+            .opacity(appeared ? 1 : 0)
+            .offset(y: appeared ? 0 : 8)
+
+            Text("Free. Open source. MIT licensed.")
+                .font(.system(size: 11.5, weight: .medium))
+                .foregroundStyle(.tertiary)
+                .tracking(0.3)
+                .padding(.top, 4)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct MissionScene: View {
+    var body: some View {
+        VStack(spacing: 28) {
+            Spacer(minLength: 0)
+
+            VStack(spacing: 12) {
+                Text("What's inside")
+                    .font(.system(size: 30, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                Text("Three things, done well.")
+                    .font(.system(size: 14))
+                    .foregroundStyle(.secondary)
+            }
+
+            VStack(spacing: 12) {
+                FeatureRow(
+                    systemImage: "sparkles",
+                    tint: Tint.blue,
+                    title: "Smart Scan",
+                    body: "Find caches, logs, broken installs, and the AI-app history hiding in your library."
+                )
+                FeatureRow(
+                    systemImage: "square.grid.2x2.fill",
+                    tint: Tint.purple,
+                    title: "App Uninstaller",
+                    body: "Drag an app, see every file it dropped, remove all of it. No leftovers."
+                )
+                FeatureRow(
+                    systemImage: "doc.questionmark.fill",
+                    tint: Tint.pink,
+                    title: "Orphan Finder",
+                    body: "Surfaces files that outlived the apps that created them."
+                )
+            }
+            .frame(maxWidth: 460)
+
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+private struct FeatureRow: View {
+    let systemImage: String
+    let tint: Color
+    let title: String
+    let body_: String
+
+    init(systemImage: String, tint: Color, title: String, body: String) {
+        self.systemImage = systemImage
+        self.tint = tint
+        self.title = title
+        self.body_ = body
+    }
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            IconTile(systemName: systemImage, tint: tint, size: 36, corner: 9)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                    .font(.system(size: 14, weight: .semibold))
+                Text(body_)
+                    .font(.system(size: 12.5))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer()
+        }
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.primary.opacity(0.04))
+        )
+    }
+}
+
+private struct PermissionScene: View {
+    let hasFda: Bool
+    let hasOpenedSettings: Bool
+    let openSettings: () -> Void
+    let revealAppInFinder: () -> Void
+
+    var body: some View {
+        VStack(spacing: 20) {
+            VStack(spacing: 10) {
+                Text(hasFda ? "Permission granted" : "One permission, then we're done")
+                    .font(.system(size: 26, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                Text(hasFda
+                     ? "PureMac can now reach the locations macOS protects by default."
+                     : "macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly.")
+                    .font(.system(size: 13))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 460)
+            }
+
+            FDADemoView()
+                .frame(maxWidth: 440)
+
+            if hasFda {
+                Label("All set — moving you to the next step.", systemImage: "checkmark.circle.fill")
+                    .font(.system(size: 12.5, weight: .medium))
+                    .foregroundStyle(Tint.green)
+                    .transition(.opacity.combined(with: .scale))
+            } else {
+                VStack(spacing: 6) {
+                    Button {
+                        openSettings()
+                    } label: {
+                        Label(hasOpenedSettings ? "Reopen Settings" : "Open Settings & reveal PureMac",
+                              systemImage: "gear")
+                            .font(.system(size: 13, weight: .semibold))
+                            .frame(minWidth: 280)
+                            .padding(.vertical, 4)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .keyboardShortcut(.defaultAction)
+
+                    if hasOpenedSettings {
+                        HStack(spacing: 14) {
+                            Button("Reveal app again") { revealAppInFinder() }
+                                .buttonStyle(.link)
+                                .font(.system(size: 11.5))
+                            Button("Reset permissions") {
+                                _ = FullDiskAccessManager.shared.resetFullDiskAccess()
+                                FullDiskAccessManager.shared.triggerRegistration()
+                            }
+                            .buttonStyle(.link)
+                            .font(.system(size: 11.5))
+                        }
+                        .transition(.opacity)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ReadyScene: View {
+    let hasFda: Bool
+    @State private var bounce = false
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Spacer(minLength: 0)
+
+            ZStack {
+                Circle()
+                    .fill((hasFda ? Tint.green : Tint.orange).opacity(0.12))
+                    .frame(width: 110, height: 110)
+                Image(systemName: hasFda ? "checkmark" : "hand.wave.fill")
+                    .font(.system(size: 50, weight: .semibold))
+                    .foregroundStyle(hasFda ? Tint.green : Tint.orange)
+                    .scaleEffect(bounce ? 1.05 : 1.0)
+            }
+            .onAppear {
+                withAnimation(.spring(response: 0.5, dampingFraction: 0.55)) {
+                    bounce = true
+                }
+            }
+
+            VStack(spacing: 10) {
+                Text(hasFda ? "You're ready" : "Ready when you are")
+                    .font(.system(size: 30, weight: .semibold))
+                Text(hasFda
+                     ? "Hit Start to run your first Smart Scan."
+                     : "Some features will be limited without Full Disk Access. You can grant it later in Settings.")
+                    .font(.system(size: 13.5))
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 420)
+            }
+
+            Spacer(minLength: 0)
+        }
     }
 }

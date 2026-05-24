@@ -301,3 +301,26 @@
 
 /* Notifications */
 "Found %@ of junk files." = "Found %@ of junk files.";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "Reclaim your Mac";
+"Apple sells you small disks. We help you keep them clean." = "Apple sells you small disks. We help you keep them clean.";
+"Free. Open source. MIT licensed." = "Free. Open source. MIT licensed.";
+"What's inside" = "What's inside";
+"Three things, done well." = "Three things, done well.";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "Find caches, logs, broken installs, and the AI-app history hiding in your library.";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "Drag an app, see every file it dropped, remove all of it. No leftovers.";
+"Surfaces files that outlived the apps that created them." = "Surfaces files that outlived the apps that created them.";
+"One permission, then we're done" = "One permission, then we're done";
+"Permission granted" = "Permission granted";
+"PureMac can now reach the locations macOS protects by default." = "PureMac can now reach the locations macOS protects by default.";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly.";
+"All set — moving you to the next step." = "All set — moving you to the next step.";
+"Reveal app again" = "Reveal app again";
+"Reset permissions" = "Reset permissions";
+"You're ready" = "You're ready";
+"Ready when you are" = "Ready when you are";
+"Hit Start to run your first Smart Scan." = "Hit Start to run your first Smart Scan.";
+"Skip" = "Skip";
+"Start" = "Start";
+"Continue" = "Continue";

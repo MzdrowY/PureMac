@@ -301,3 +301,26 @@
 "1-tap setup. We'll auto-retry what failed." = "ワンタップ設定。失敗した処理は自動的に再試行します。";
 "Fix permission" = "権限を修正";
 "Dismiss" = "閉じる";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "Mac を取り戻そう";
+"Apple sells you small disks. We help you keep them clean." = "Apple のストレージは小さい。だからこそ、きれいに保ちます。";
+"Free. Open source. MIT licensed." = "無料。オープンソース。MIT ライセンス。";
+"What's inside" = "中身を見る";
+"Three things, done well." = "3 つのことを、しっかりと。";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "キャッシュ、ログ、壊れたインストール、ライブラリに潜む AI アプリの履歴を見つけます。";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "アプリをドラッグして、残したすべてのファイルを確認し、まとめて削除。残骸ゼロ。";
+"Surfaces files that outlived the apps that created them." = "アプリを削除した後も残ったファイルを表示します。";
+"One permission, then we're done" = "1 つの権限、それだけ";
+"Permission granted" = "権限を付与しました";
+"PureMac can now reach the locations macOS protects by default." = "PureMac は macOS が標準で保護している場所にアクセスできるようになりました。";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "macOS は許可するまですべてのアプリから一部のフォルダを隠します。キャッシュの発見とクリーンなアンインストールに必要です。";
+"All set — moving you to the next step." = "準備完了 - 次のステップへ進みます。";
+"Reveal app again" = "アプリをもう一度表示";
+"Reset permissions" = "権限をリセット";
+"You're ready" = "準備完了";
+"Ready when you are" = "いつでもどうぞ";
+"Hit Start to run your first Smart Scan." = "「開始」を押して最初のスマートスキャンを実行。";
+"Skip" = "スキップ";
+"Start" = "開始";
+"Continue" = "続ける";

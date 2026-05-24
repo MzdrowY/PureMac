@@ -14,14 +14,12 @@
 <h1 align="center">PureMac</h1>
 
 <p align="center">
-  <b>Free, open-source macOS app manager and system cleaner.</b><br>
-  Uninstall apps completely. Find orphaned files. Clean system junk.<br>
-  No subscriptions. No telemetry. No data collection.
+  <b>Reclaim your Mac.</b><br>
+  Free, open-source uninstaller and cleaner for macOS. No subscription, no telemetry, no upsell.
 </p>
 
 <p align="center">
   <a href="https://github.com/momenbasel/PureMac/releases/latest"><img src="https://img.shields.io/github/v/release/momenbasel/PureMac?style=flat-square&label=Download" alt="Latest Release"></a>
-  <a href="https://github.com/momenbasel/PureMac/actions/workflows/build.yml"><img src="https://img.shields.io/github/actions/workflow/status/momenbasel/PureMac/build.yml?style=flat-square&label=Build" alt="Build Status"></a>
   <img src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square" alt="macOS 13.0+">
   <img src="https://img.shields.io/badge/Swift-5.9-orange?style=flat-square" alt="Swift 5.9">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/momenbasel/PureMac?style=flat-square" alt="MIT License"></a>
@@ -31,7 +29,9 @@
 
 <p align="center">
   <a href="#install">Install</a> -
-  <a href="#features">Features</a> -
+  <a href="#why-this-exists">Why this exists</a> -
+  <a href="#what-it-does">What it does</a> -
+  <a href="#permissions">Permissions</a> -
   <a href="#screenshots">Screenshots</a> -
   <a href="#contributing">Contributing</a>
 </p>
@@ -40,18 +40,11 @@
 
 ## Install
 
-### Homebrew (recommended)
-
 ```bash
-brew update
 brew install --cask puremac
 ```
 
-### Direct Download
-
-Download the latest `.dmg` from [Releases](https://github.com/momenbasel/PureMac/releases/latest), open it, and drag PureMac to `/Applications`.
-
-> Signed and notarized with Apple Developer ID - installs without Gatekeeper warnings.
+Or download the signed, notarized `.dmg` from [Releases](https://github.com/momenbasel/PureMac/releases/latest) and drag PureMac into `/Applications`. No Gatekeeper warnings, no quarantine workaround.
 
 ### Build from source
 
@@ -60,52 +53,61 @@ brew install xcodegen
 git clone https://github.com/momenbasel/PureMac.git
 cd PureMac
 xcodegen generate
-xcodebuild -project PureMac.xcodeproj -scheme PureMac -configuration Release -derivedDataPath build build
+xcodebuild -project PureMac.xcodeproj -scheme PureMac -configuration Release \
+  -derivedDataPath build build
 open build/Build/Products/Release/PureMac.app
 ```
 
-## Features
+## Why this exists
+
+Apple sells base-model Macs with 256 GB SSDs that you can't upgrade. The Mac mini, the Air, every entry-level MacBook Pro - the drive is soldered down. The next storage tier costs more than a midrange Windows laptop. Once you've paid it, every gigabyte you've already bought matters.
+
+Most Mac cleaners are subscription apps that hide their disk usage behind a paywall, ship telemetry by default, and trade on FUD ("47 GB of junk detected!"). PureMac is the opposite:
+
+- **One-time install.** No subscription, no trial, no account.
+- **No telemetry.** It never phones home. It doesn't even know you exist.
+- **Open source under MIT.** Read the code, fork it, audit it.
+- **Honest scans.** "Junk" means actually-junk: cache directories the OS itself would purge, orphaned files left by apps you've already deleted, broken installer receipts, that 4 GB Xcode DerivedData blob from 2023.
+- **Real uninstalls.** Drag an app, see every preference plist, cache folder, container, launch agent and log file it dropped across your library, remove all of it at once.
+
+The goal is to leave behind software that respects the people running it long after the people who wrote it have moved on.
+
+## What it does
 
 ### App Uninstaller
-- Discovers all installed apps from `/Applications` and `~/Applications`
-- Heuristic file discovery engine with **10-level matching** (bundle ID, company name, entitlements, team identifier, Spotlight metadata, container discovery)
-- **3 sensitivity levels**: Strict (safe), Enhanced (balanced), Deep (thorough)
-- Shows all related files: caches, preferences, containers, logs, support files, launch agents
-- System app protection - 27 Apple apps are excluded from the uninstall list
-- Master-detail view: app table on left, discovered files on right
+Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped on your disk. Three sensitivity tiers - Strict, Enhanced, Deep - let you choose how aggressive that match is. Apple system apps are excluded from the uninstall list automatically.
 
-### Orphaned File Finder
-- Detects leftover files in `~/Library` from apps that have been uninstalled
-- Compares Library contents against all installed app identifiers
-- One-click cleanup of orphaned files
+### Orphan Finder
+Walks `~/Library` and surfaces files left behind by apps that no longer exist on disk. The matcher compares against bundle identifiers and normalized names of every installed app, so a leftover `~/Library/Containers/com.foo.bar` from an app you deleted in 2022 shows up clearly.
 
 ### System Cleaner
-- **Smart Scan** - one-click scan across all categories
-- **System Junk** - system caches, logs, and temporary files
-- **User Cache** - dynamically discovers all app caches (no hardcoded app list)
-- **AI Apps** - Ollama and LM Studio logs, caches, and opt-in local history cleanup
-- **Mail Attachments** - downloaded mail attachments
-- **Trash Bins** - empty all Trash
-- **Large & Old Files** - files over 100 MB or older than 1 year
-- **Purgeable Space** - APFS purgeable disk space detection
+Smart Scan runs every category in parallel. Each category is its own deliberate scanner:
+
+- **System Junk** - system caches, logs, temp files
+- **User Cache** - dynamically discovered, no hardcoded app list
+- **AI Apps** - Ollama and LM Studio logs, caches, opt-in history cleanup
+- **Mail Files** - downloaded mail attachments
+- **Trash Bins** - empties all bins, including external volumes
+- **Large & Old Files** - >100 MB or older than 1 year (never auto-selected)
+- **Purgeable Space** - reclaims APFS purgeable space via `diskutil`
 - **Xcode Junk** - DerivedData, Archives, simulator caches
-- **Brew Cache** - Homebrew download cache (detects custom HOMEBREW_CACHE)
-- **Scheduled Cleaning** - automatic scans on configurable intervals
+- **Brew Cache** - respects custom `HOMEBREW_CACHE`
+- **Node Cache** - npm, yarn classic, pnpm content-addressable store
+- **Docker Cache** - images, containers, build cache
 
-### Native macOS Experience
-- Built with SwiftUI using native macOS components
-- `NavigationSplitView`, `Toggle`, `ProgressView`, `Form`, `GroupBox`, `Table`
-- Respects system light/dark mode automatically
-- No custom gradients, glows, or web-app styling
-- First-launch onboarding with Full Disk Access setup
+### Scheduled Cleaning
+Optional. Configurable interval (hourly to monthly), with auto-clean threshold so background runs only fire when there's something meaningful to remove.
 
-### Safety
-- Confirmation dialogs before all destructive operations
-- Symlink attack prevention - resolves and validates paths before deletion
-- System app protection - Apple apps cannot be uninstalled
-- Large & Old Files are never auto-selected
-- AI prompt and conversation history is visible for review but never selected automatically
-- Structured logging via `os.log` (visible in Console.app)
+## Permissions
+
+PureMac needs **Full Disk Access** to read the locations macOS hides from every app by default - Mail downloads, Safari data, the TCC database, protected app containers. Without it, the cleanup categories miss roughly 70% of what they could find and app uninstalls leave behind everything in `~/Library/Containers`.
+
+The first-launch onboarding walks you through granting it with an animated preview of the exact toggle you need to flip. If you skip it, the dashboard surfaces a single-click "Set up" pill. If a cleanup fails because of a permission issue, PureMac opens System Settings, reveals its bundle in Finder so you can drag it into the FDA list, polls the permission state every second, and auto-retries the failed batch the moment you grant access. You never have to re-select anything.
+
+What PureMac does *not* do:
+- It does not collect telemetry, crash reports, or usage analytics.
+- It does not require a network connection to operate.
+- It does not move data anywhere except the Trash and `diskutil`'s APFS purge command.
 
 ## Screenshots
 
@@ -128,45 +130,54 @@ PureMac/
   Logic/Scanning/     - Heuristic scan engine, locations database, conditions
   Logic/Utilities/    - Structured logging
   Models/             - Data models, typed errors
-  Services/           - Scan engine, cleaning engine, scheduler
+  Services/           - Scan engine, cleaning engine, permission coordinator, scheduler
   ViewModels/         - Centralized app state
   Views/              - Native SwiftUI views
     Apps/             - App uninstaller views
-    Cleaning/         - Smart scan and category views
+    Components/       - Shared components (FDA demo, permission sheet, theme)
     Orphans/          - Orphan finder
     Settings/         - Native Form-based settings
-    Components/       - Shared components
 ```
 
 Key components:
 - **AppPathFinder** - 10-level heuristic matching engine for discovering app-related files
 - **Locations** - 120+ macOS filesystem search paths
 - **Conditions** - 25 per-app matching rules for edge cases (Xcode, Chrome, VS Code, etc.)
-- **AppInfoFetcher** - Spotlight metadata + Info.plist fallback for app discovery
-- **Logger** - Apple `os.log` unified logging
+- **PermissionCoordinator** - Single source of truth for FDA prompts, polling, and post-grant retries
+- **FullDiskAccessManager** - TCC probe + registration; broad probe paths (Mail, Safari, Messages, AddressBook, Calendars) so macOS catalogs the bundle reliably
+- **CleaningEngine** - Symlink-resistant deletion with an allow-list, NSAppleScript-based admin escalation for root-owned items, NUL-separated path staging for xargs
+
+## Security
+
+- Symlink attack prevention: paths are resolved before validation, re-resolved immediately before unlink to close TOCTOU windows.
+- Allow-list cleaning: a path that doesn't sit inside an explicit safe-root is refused, even for the user-level pass.
+- Admin escalation is gated by a *narrower* allow-list (app bundles, package receipts, launch plists) than the normal cleaner — root-owned items can only be removed inside those roots.
+- System app protection: Apple's bundles cannot be uninstalled, regardless of selection.
+- All destructive operations require explicit confirmation by default. The toggle that disables that confirmation is buried in Settings.
+
+If you find a vulnerability, please open a private security advisory rather than a public issue.
 
 ## Contributing
 
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Pull requests welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-Areas where help is especially welcome:
-- Size/date filter presets in category views
-- XCTest coverage for AppState and scan engine
-- Localization (zh-Hans, zh-Hant, and other languages)
+Especially welcome:
+- Per-category size and date filter presets
+- Wider XCTest coverage for `AppState` and the scan engine
+- Translations beyond the current set (en, ar, es, ja, pt-BR, zh-Hans, zh-Hant)
 - App icon design
 
 ## Acknowledgments
 
-v2.0 was shaped by community feedback and contributions:
-
-- **[@nguyenhuy158](https://github.com/nguyenhuy158)** - Search and filter feature request ([#18](https://github.com/momenbasel/PureMac/issues/18)) and implementation ([#29](https://github.com/momenbasel/PureMac/pull/29))
+- **[@nguyenhuy158](https://github.com/nguyenhuy158)** - Search and filter feature ([#18](https://github.com/momenbasel/PureMac/issues/18), [#29](https://github.com/momenbasel/PureMac/pull/29))
 - **[@edufalcao](https://github.com/edufalcao)** - Cleaning safety guards and confirmation dialogs ([#30](https://github.com/momenbasel/PureMac/pull/30))
-- **[@zeck00](https://github.com/zeck00)** - UI overhaul ([#31](https://github.com/momenbasel/PureMac/pull/31)), app uninstaller with system app protection ([#32](https://github.com/momenbasel/PureMac/pull/32)), and onboarding experience ([#33](https://github.com/momenbasel/PureMac/pull/33))
+- **[@zeck00](https://github.com/zeck00)** - UI overhaul ([#31](https://github.com/momenbasel/PureMac/pull/31)), app uninstaller with system app protection ([#32](https://github.com/momenbasel/PureMac/pull/32)), onboarding experience ([#33](https://github.com/momenbasel/PureMac/pull/33))
 - **[@0x-man](https://github.com/0x-man)** - Symlink security vulnerability report ([#25](https://github.com/momenbasel/PureMac/issues/25))
 - **[@ansidev](https://github.com/ansidev)** - Checkbox interaction bug report ([#34](https://github.com/momenbasel/PureMac/issues/34))
 - **[@fengcheng01](https://github.com/fengcheng01)** - App uninstaller feature request ([#28](https://github.com/momenbasel/PureMac/issues/28))
 - **[@scholzfuni](https://github.com/scholzfuni)** - Modularization proposal ([#23](https://github.com/momenbasel/PureMac/issues/23))
+- **[@Zonharo](https://github.com/Zonharo)** - In-app auto-update request ([#94](https://github.com/momenbasel/PureMac/issues/94))
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE). Use it, fork it, ship it under your own name if you want - the only thing the license asks is that the notice stays.

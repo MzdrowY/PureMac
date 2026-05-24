@@ -114,7 +114,7 @@ struct CategoryDetailView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(LocalizedStringKey(category.rawValue))
-                        .font(.system(size: 22, weight: .bold))
+                        .font(.system(size: 22, weight: .semibold))
                     Text(LocalizedStringKey(category.description))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)

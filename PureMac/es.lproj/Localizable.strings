@@ -301,3 +301,26 @@
 "1-tap setup. We'll auto-retry what failed." = "Configuración en un toque. Reintentaremos automáticamente lo que falle.";
 "Fix permission" = "Arreglar permiso";
 "Dismiss" = "Descartar";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "Recupera tu Mac";
+"Apple sells you small disks. We help you keep them clean." = "Apple te vende discos pequeños. Te ayudamos a mantenerlos limpios.";
+"Free. Open source. MIT licensed." = "Gratis. Código abierto. Licencia MIT.";
+"What's inside" = "Qué hay dentro";
+"Three things, done well." = "Tres cosas, bien hechas.";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "Encuentra cachés, registros, instalaciones rotas y el historial de apps de IA escondido en tu biblioteca.";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "Arrastra una app, ve cada archivo que dejó, elimínalo todo. Sin sobras.";
+"Surfaces files that outlived the apps that created them." = "Encuentra archivos que sobrevivieron a las apps que los crearon.";
+"One permission, then we're done" = "Un permiso y listo";
+"Permission granted" = "Permiso concedido";
+"PureMac can now reach the locations macOS protects by default." = "PureMac ya puede acceder a las ubicaciones que macOS protege por defecto.";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "macOS oculta ciertas carpetas hasta que tú lo decides. Las necesitamos para encontrar cachés y desinstalar limpiamente.";
+"All set — moving you to the next step." = "Todo listo - pasando al siguiente paso.";
+"Reveal app again" = "Mostrar app de nuevo";
+"Reset permissions" = "Restablecer permisos";
+"You're ready" = "Listo";
+"Ready when you are" = "Listos cuando lo estés";
+"Hit Start to run your first Smart Scan." = "Pulsa Empezar para tu primer Smart Scan.";
+"Skip" = "Omitir";
+"Start" = "Empezar";
+"Continue" = "Continuar";

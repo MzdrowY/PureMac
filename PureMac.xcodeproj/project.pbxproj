@@ -17,6 +17,7 @@
 		48D1431A7C99C19EEBDB056B /* CleaningEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A8DE5D45BA19E2670B57DC5 /* CleaningEngine.swift */; };
 		4F754D89F4CE5142BE384062 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31F91226CDCFBB8E303B7DA /* AppConstants.swift */; };
 		50304378D99F2E9E48B642AF /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 9CC8F66E27BE52A6639E904B /* Sparkle */; };
+		52F11962555C639F0EECADD6 /* FDADemoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 231FF7CBB5F621B66F2AB8A5 /* FDADemoView.swift */; };
 		535B23C0108C06475215B8E8 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AB003A7751F05727DBFD1A5 /* AppTheme.swift */; };
 		59B3096E2AE8ED0397B16798 /* AppLanguagePreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 491771F923C93FD61A263893 /* AppLanguagePreferencesTests.swift */; };
 		61D285E96DED76FDCD54570F /* PermissionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 069AAE87E3F9EDE5593AD8B3 /* PermissionSheet.swift */; };
@@ -67,6 +68,7 @@
 		155CE1B8CDCCCA6F9FD028C1 /* LocalizationFilesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalizationFilesTests.swift; sourceTree = "<group>"; };
 		1AB003A7751F05727DBFD1A5 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
 		1D3AC5F17D7CA94FAB1E8D7A /* StringNormalization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringNormalization.swift; sourceTree = "<group>"; };
+		231FF7CBB5F621B66F2AB8A5 /* FDADemoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FDADemoView.swift; sourceTree = "<group>"; };
 		23486A54A82EE3865B784D1C /* AppInfoFetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppInfoFetcher.swift; sourceTree = "<group>"; };
 		2641C6376DD6F5889F35510E /* zh-Hans */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = "zh-Hans"; path = "zh-Hans.lproj/Localizable.strings"; sourceTree = "<group>"; };
 		28181F034530331A550C6A3D /* SchedulerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SchedulerService.swift; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 				92259B3E9F4468865F15DEEC /* AppearancePill.swift */,
 				1AB003A7751F05727DBFD1A5 /* AppTheme.swift */,
 				424F7B28624C271620E13BBC /* EmptyStateView.swift */,
+				231FF7CBB5F621B66F2AB8A5 /* FDADemoView.swift */,
 				069AAE87E3F9EDE5593AD8B3 /* PermissionSheet.swift */,
 			);
 			path = Components;
@@ -418,6 +421,7 @@
 				8947F0CE448791BD50EECF46 /* Conditions.swift in Sources */,
 				A2AE68CC75CB72D6B10CBDF5 /* DashboardView.swift in Sources */,
 				76B132F9C499225D33E0D075 /* EmptyStateView.swift in Sources */,
+				52F11962555C639F0EECADD6 /* FDADemoView.swift in Sources */,
 				2253F11BDF561B617439C96B /* FullDiskAccessManager.swift in Sources */,
 				E60B0A2C5D0A6CAE35BF4DFB /* Locations.swift in Sources */,
 				DDDA5879006CB97D5D7BDD87 /* Logger.swift in Sources */,
@@ -517,7 +521,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				DEVELOPMENT_TEAM = H3WXHVTP97;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -539,7 +543,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PureMac/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.4.0;
+				MARKETING_VERSION = 2.5.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = NO;
@@ -641,7 +645,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 8;
+				CURRENT_PROJECT_VERSION = 9;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEVELOPMENT_TEAM = H3WXHVTP97;
 				ENABLE_NS_ASSERTIONS = NO;
@@ -657,7 +661,7 @@
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = PureMac/Info.plist;
 				MACOSX_DEPLOYMENT_TARGET = 13.0;
-				MARKETING_VERSION = 2.4.0;
+				MARKETING_VERSION = 2.5.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = NO;

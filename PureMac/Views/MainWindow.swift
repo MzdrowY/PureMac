@@ -150,25 +150,13 @@ struct MainWindow: View {
             }
             Spacer()
             if !ok {
-                Button {
+                Button("Fix") {
                     permission.requestAccess(context: .general) {
                         appState.checkFullDiskAccess()
                     }
-                } label: {
-                    Image(systemName: "wrench.and.screwdriver.fill")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 9)
-                        .padding(.vertical, 5)
-                        .background(
-                            Capsule().fill(
-                                LinearGradient(colors: [Tint.orange, Color(red: 1, green: 0.42, blue: 0.0)],
-                                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                            )
-                        )
-                        .shadow(color: Tint.orange.opacity(0.45), radius: 5, y: 2)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 .help("Fix permission")
             }
         }
@@ -226,69 +214,51 @@ struct MainWindow: View {
         pulsingLockIconView()
     }
 
-    // Premium FDA toast — gradient backdrop, glow, primary action plus a
-    // subtle dismiss. Visually distinct enough that users actually notice
-    // and act on it without it screaming.
+    // Quiet FDA bar — single tinted surface, no gradient or glow.
     private var fdaToast: some View {
-        HStack(spacing: 14) {
-            ZStack {
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                    .fill(Color.white.opacity(0.22))
-                pulsingLockIcon
-            }
-            .frame(width: 40, height: 40)
+        HStack(spacing: 12) {
+            IconTile(systemName: "lock.shield.fill", tint: Tint.orange, size: 32, corner: 8)
 
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 1) {
                 Text("Full Disk Access required")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundStyle(.white)
+                    .font(.system(size: 13, weight: .semibold))
                 Text("1-tap setup. We'll auto-retry what failed.")
                     .font(.system(size: 11.5))
-                    .foregroundStyle(.white.opacity(0.92))
+                    .foregroundStyle(.secondary)
             }
 
             Spacer()
 
-            Button {
+            Button("Set up") {
                 permission.requestAccess(context: .general) {
                     appState.checkFullDiskAccess()
                 }
-            } label: {
-                Label("Quick Setup", systemImage: "sparkles")
-                    .font(.system(size: 12.5, weight: .semibold))
-                    .padding(.horizontal, 6)
             }
             .buttonStyle(.borderedProminent)
-            .tint(.white)
-            .foregroundStyle(Tint.orange)
-            .controlSize(.large)
+            .controlSize(.regular)
 
             Button {
                 appState.fdaBannerDismissed = true
             } label: {
                 Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .padding(8)
-                    .background(Circle().fill(Color.white.opacity(0.10)))
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(6)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Dismiss")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
         .background(
-            ZStack {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(
-                        LinearGradient(colors: [Tint.orange, Color(red: 1.0, green: 0.42, blue: 0.0)],
-                                       startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.18), lineWidth: 0.5)
-            }
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Tint.orange.opacity(0.08))
         )
-        .shadow(color: Tint.orange.opacity(0.45), radius: 14, y: 6)
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .strokeBorder(Tint.orange.opacity(0.22), lineWidth: 0.5)
+        )
     }
 }
 

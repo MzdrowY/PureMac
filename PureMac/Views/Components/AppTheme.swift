@@ -43,57 +43,50 @@ final class ThemeManager: ObservableObject {
     }
 }
 
-/// Centralized accent palette. Keeping these in one place lets the dashboard
-/// and sidebar share semantic tints (cleanup orange, performance green, etc.)
-/// instead of scattered Color literals.
+/// Centralized accent palette. One blue, one green for success, one orange
+/// for warning, one red for destructive. Other tints exist for categorical
+/// differentiation but the surface chrome only uses these four.
 enum Tint {
     static let blue   = Color(red: 0.04, green: 0.52, blue: 1.00)
     static let green  = Color(red: 0.18, green: 0.78, blue: 0.47)
-    static let orange = Color(red: 1.00, green: 0.62, blue: 0.04)
-    static let purple = Color(red: 0.69, green: 0.32, blue: 0.87)
+    static let orange = Color(red: 1.00, green: 0.58, blue: 0.04)
+    static let purple = Color(red: 0.55, green: 0.32, blue: 0.87)
     static let pink   = Color(red: 1.00, green: 0.30, blue: 0.50)
-    static let cyan   = Color(red: 0.30, green: 0.80, blue: 0.95)
+    static let cyan   = Color(red: 0.30, green: 0.78, blue: 0.95)
     static let red    = Color(red: 1.00, green: 0.27, blue: 0.23)
     static let yellow = Color(red: 1.00, green: 0.78, blue: 0.04)
 }
 
 /// Tinted square icon container used in the sidebar and on dashboard cards.
-/// The optional inner gradient + soft shadow give the tile depth rather than
-/// the previous flat color swatch.
+/// Single muted fill, thin border. The tint identifies the category - it
+/// doesn't need to glow.
 struct IconTile: View {
     let systemName: String
     var tint: Color = Tint.blue
     var size: CGFloat = 26
     var corner: CGFloat = 7
+    /// Retained for callsite compatibility; intentionally a no-op in the
+    /// restrained design so call sites don't have to change.
     var glow: Bool = false
 
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: corner, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.22), tint.opacity(0.10)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-            RoundedRectangle(cornerRadius: corner, style: .continuous)
-                .strokeBorder(tint.opacity(0.18), lineWidth: 0.5)
+                .fill(tint.opacity(0.14))
             Image(systemName: systemName)
                 .font(.system(size: size * 0.52, weight: .semibold))
                 .foregroundStyle(tint)
         }
         .frame(width: size, height: size)
-        .shadow(color: glow ? tint.opacity(0.35) : .clear, radius: glow ? 6 : 0, y: 1)
     }
 }
 
-/// Premium card surface used on the dashboard, suggestion list, and detail
-/// pages. Inner gradient fill + dual-layer shadow (ambient + contact) gives
-/// the cards depth without dropping into heavy material that fights the
-/// system look. Optional accent stripe lights up the leading edge so cards
-/// can carry semantic colour without painting the whole surface.
+/// Card surface. Flat fill, hairline border, single soft shadow. No accent
+/// stripe by default — content hierarchy carries the meaning, not chrome.
 struct CardSurface<Content: View>: View {
     var padding: CGFloat = 16
+    /// Retained for callsite compatibility; the accent line is intentionally
+    /// not rendered in the restrained design.
     var accent: Color? = nil
     var elevation: CardElevation = .standard
     @ViewBuilder var content: Content
@@ -102,41 +95,14 @@ struct CardSurface<Content: View>: View {
         content
             .padding(padding)
             .background(
-                ZStack {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color(nsColor: .controlBackgroundColor))
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(0.04),
-                                    Color.clear,
-                                ],
-                                startPoint: .top, endPoint: .bottom
-                            )
-                        )
-                    if let accent {
-                        HStack(spacing: 0) {
-                            Rectangle()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [accent.opacity(0.85), accent.opacity(0.35)],
-                                        startPoint: .top, endPoint: .bottom
-                                    )
-                                )
-                                .frame(width: 3)
-                            Spacer(minLength: 0)
-                        }
-                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                    }
-                }
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color(nsColor: .controlBackgroundColor))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
                     .strokeBorder(Color.primary.opacity(0.07), lineWidth: 0.5)
             )
             .shadow(color: .black.opacity(elevation.ambient), radius: elevation.ambientRadius, y: elevation.ambientY)
-            .shadow(color: .black.opacity(elevation.contact), radius: 1, y: 0.5)
     }
 }
 
@@ -145,32 +111,30 @@ enum CardElevation {
 
     var ambient: Double {
         switch self {
-        case .flat: return 0.02
-        case .standard: return 0.06
-        case .raised: return 0.10
+        case .flat: return 0.0
+        case .standard: return 0.04
+        case .raised: return 0.07
         }
     }
 
     var ambientRadius: CGFloat {
         switch self {
-        case .flat: return 2
-        case .standard: return 6
-        case .raised: return 14
+        case .flat: return 0
+        case .standard: return 4
+        case .raised: return 10
         }
     }
 
     var ambientY: CGFloat {
         switch self {
-        case .flat: return 1
-        case .standard: return 2
-        case .raised: return 6
+        case .flat: return 0
+        case .standard: return 1
+        case .raised: return 3
         }
     }
-
-    var contact: Double { 0.05 }
 }
 
-/// Pill-shaped chip used for inline status pills (severity, counts, etc.).
+/// Small status pill. Solid tint background at low opacity, no gradient.
 struct StatusChip: View {
     let label: String
     var systemImage: String? = nil
@@ -188,33 +152,21 @@ struct StatusChip: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 3)
-        .background(
-            Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [tint.opacity(0.22), tint.opacity(0.12)],
-                        startPoint: .topLeading, endPoint: .bottomTrailing
-                    )
-                )
-        )
-        .overlay(
-            Capsule().strokeBorder(tint.opacity(0.25), lineWidth: 0.5)
-        )
+        .background(Capsule().fill(tint.opacity(0.14)))
         .foregroundStyle(tint)
     }
 }
 
-/// Modifier that bumps an element on hover and shrinks it on press. Cheap way
-/// to give cards and rows a tactile feel without writing per-call animations.
+/// Subtle hover/press feedback for tappable cards. Scale only — no glow.
 struct PressableScale: ViewModifier {
     @State private var hovering = false
     @State private var pressing = false
-    var hoverScale: CGFloat = 1.012
+    var hoverScale: CGFloat = 1.006
 
     func body(content: Content) -> some View {
         content
-            .scaleEffect(pressing ? 0.985 : (hovering ? hoverScale : 1.0))
-            .animation(.spring(response: 0.22, dampingFraction: 0.75), value: hovering)
+            .scaleEffect(pressing ? 0.99 : (hovering ? hoverScale : 1.0))
+            .animation(.easeOut(duration: 0.18), value: hovering)
             .animation(.easeOut(duration: 0.08), value: pressing)
             .onHover { hovering = $0 }
             .simultaneousGesture(
@@ -226,7 +178,7 @@ struct PressableScale: ViewModifier {
 }
 
 extension View {
-    func pressable(hoverScale: CGFloat = 1.012) -> some View {
+    func pressable(hoverScale: CGFloat = 1.006) -> some View {
         modifier(PressableScale(hoverScale: hoverScale))
     }
 }

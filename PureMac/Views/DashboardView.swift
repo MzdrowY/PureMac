@@ -91,17 +91,10 @@ struct DashboardView: View {
                                 }
                             }
                             Text(ByteCountFormatter.string(fromByteCount: free, countStyle: .file))
-                                .font(.system(size: 34, weight: .bold))
+                                .font(.system(size: 34, weight: .semibold))
                                 .monospacedDigit()
                                 .contentTransition(.numericText())
-                                .foregroundStyle(
-                                    LinearGradient(
-                                        colors: stress
-                                            ? [Tint.orange, Tint.red]
-                                            : [Color.primary, Color.primary.opacity(0.85)],
-                                        startPoint: .top, endPoint: .bottom
-                                    )
-                                )
+                                .foregroundStyle(stress ? Tint.orange : Color.primary)
                             Text(freeOfText(total: total))
                                 .font(.system(size: 12))
                                 .foregroundStyle(.secondary)
@@ -343,13 +336,9 @@ struct DashboardView: View {
                 HStack(alignment: .firstTextBaseline) {
                     if !isClean {
                         Text(ByteCountFormatter.string(fromByteCount: appState.totalJunkSize, countStyle: .file))
-                            .font(.system(size: 40, weight: .bold))
+                            .font(.system(size: 40, weight: .semibold))
                             .monospacedDigit()
                             .contentTransition(.numericText())
-                            .foregroundStyle(
-                                LinearGradient(colors: [Tint.orange, Tint.red],
-                                               startPoint: .top, endPoint: .bottom)
-                            )
                         Text("found")
                             .font(.system(size: 16))
                             .foregroundStyle(.secondary)
@@ -424,9 +413,8 @@ struct DashboardView: View {
     @ViewBuilder
     private var bigCheckmark: some View {
         let base = Image(systemName: "checkmark")
-            .font(.system(size: 60, weight: .bold))
+            .font(.system(size: 54, weight: .semibold))
             .foregroundStyle(Tint.green)
-            .shadow(color: Tint.green.opacity(0.5), radius: 12)
         if #available(macOS 14.0, *) {
             base.symbolEffect(.bounce, value: appState.totalFreedSpace)
         } else {
@@ -476,27 +464,16 @@ struct DashboardView: View {
                 ZStack {
                     Circle()
                         .fill(Tint.green.opacity(0.12))
-                        .blur(radius: 20)
-                    Circle()
-                        .fill(
-                            LinearGradient(colors: [Tint.green.opacity(0.30), Tint.green.opacity(0.10)],
-                                           startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
-                    Circle()
-                        .strokeBorder(Tint.green.opacity(0.30), lineWidth: 2)
                     bigCheckmark
                 }
-                .frame(width: 140, height: 140)
+                .frame(width: 120, height: 120)
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(ByteCountFormatter.string(fromByteCount: appState.totalFreedSpace, countStyle: .file))
-                        .font(.system(size: 40, weight: .bold))
+                        .font(.system(size: 40, weight: .semibold))
                         .monospacedDigit()
                         .contentTransition(.numericText())
-                        .foregroundStyle(
-                            LinearGradient(colors: [Tint.green, Color(red: 0.10, green: 0.65, blue: 0.40)],
-                                           startPoint: .top, endPoint: .bottom)
-                        )
+                        .foregroundStyle(Tint.green)
                     Text("freed")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
@@ -596,64 +573,32 @@ private struct SuggestionRow: View {
 
 private struct StorageGauge: View {
     let percentUsed: Double  // 0...1
-    @State private var glow = false
 
     var body: some View {
         let pct = max(0, min(1, percentUsed))
         let displayPercent = Int(round(pct * 100))
         let stress = pct > 0.85
-        let primaryGradient: [Color] = stress
-            ? [Tint.orange, Tint.red]
-            : [Tint.blue, Tint.purple]
+        let arcColor: Color = stress ? Tint.orange : Tint.blue
 
         ZStack {
-            // Soft outer halo to give the ring depth.
             Circle()
-                .fill(primaryGradient.first!.opacity(glow ? 0.18 : 0.10))
-                .blur(radius: 24)
-                .scaleEffect(0.95)
-
-            Circle()
-                .stroke(Color.primary.opacity(0.08), lineWidth: 14)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 10)
 
             Circle()
                 .trim(from: 0, to: CGFloat(pct))
-                .stroke(
-                    AngularGradient(colors: primaryGradient + [primaryGradient.first!], center: .center),
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                )
+                .stroke(arcColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 .rotationEffect(.degrees(-90))
-                .shadow(color: primaryGradient.first!.opacity(0.45), radius: 10, y: 2)
-                .animation(.easeOut(duration: 0.8), value: pct)
-
-            // Pulsing dot at the arc tip — adds life without distracting.
-            Circle()
-                .fill(Color.white)
-                .frame(width: 8, height: 8)
-                .overlay(Circle().fill(primaryGradient.last!).frame(width: 4, height: 4))
-                .shadow(color: primaryGradient.last!.opacity(0.6), radius: 4)
-                .offset(y: -80)
-                .rotationEffect(.degrees(360 * pct))
-                .opacity(pct > 0.02 ? 1 : 0)
-                .animation(.easeOut(duration: 0.8), value: pct)
+                .animation(.easeOut(duration: 0.7), value: pct)
 
             VStack(spacing: 2) {
                 Text("\(displayPercent)%")
-                    .font(.system(size: 46, weight: .bold))
+                    .font(.system(size: 44, weight: .semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                    .foregroundStyle(
-                        LinearGradient(colors: primaryGradient, startPoint: .top, endPoint: .bottom)
-                    )
                 Text("USED")
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .tracking(0.6)
                     .foregroundStyle(.secondary)
-            }
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-                glow = true
             }
         }
     }
@@ -684,50 +629,30 @@ private struct ScanningGauge: View {
     var tint: Color = Tint.blue
     var label: LocalizedStringKey = "SCANNING"
     @State private var rotate = false
-    @State private var shimmer = false
 
     var body: some View {
         ZStack {
-            // Halo
             Circle()
-                .fill(tint.opacity(shimmer ? 0.20 : 0.10))
-                .blur(radius: 24)
-                .scaleEffect(0.95)
+                .stroke(Color.primary.opacity(0.07), lineWidth: 10)
 
-            Circle()
-                .stroke(Color.primary.opacity(0.08), lineWidth: 14)
-
-            // Progress arc
             Circle()
                 .trim(from: 0, to: CGFloat(max(0.05, min(0.95, progress))))
-                .stroke(
-                    AngularGradient(colors: [tint, Tint.green, tint], center: .center),
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round)
-                )
+                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
                 .rotationEffect(.degrees(rotate ? 360 : 0))
-                .shadow(color: tint.opacity(0.45), radius: 10, y: 2)
                 .animation(.linear(duration: 4).repeatForever(autoreverses: false), value: rotate)
 
             VStack(spacing: 2) {
                 Text("\(Int(progress * 100))%")
-                    .font(.system(size: 38, weight: .bold))
+                    .font(.system(size: 36, weight: .semibold))
                     .monospacedDigit()
                     .contentTransition(.numericText())
-                    .foregroundStyle(
-                        LinearGradient(colors: [tint, Tint.green], startPoint: .top, endPoint: .bottom)
-                    )
                 Text(label)
-                    .font(.system(size: 10, weight: .semibold))
+                    .font(.system(size: 10, weight: .medium))
                     .tracking(0.6)
                     .foregroundStyle(.secondary)
             }
         }
-        .onAppear {
-            rotate = true
-            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
-                shimmer = true
-            }
-        }
+        .onAppear { rotate = true }
     }
 }
 

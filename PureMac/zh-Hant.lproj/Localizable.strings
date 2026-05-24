@@ -301,3 +301,26 @@
 "1-tap setup. We'll auto-retry what failed." = "一鍵設定。我們會自動重試失敗的操作。";
 "Fix permission" = "修正權限";
 "Dismiss" = "略過";
+
+/* Onboarding v2 */
+"Reclaim your Mac" = "奪回你的 Mac";
+"Apple sells you small disks. We help you keep them clean." = "蘋果賣給你小硬碟。我們幫你保持整潔。";
+"Free. Open source. MIT licensed." = "免費。開放原始碼。MIT 授權。";
+"What's inside" = "裡面有什麼";
+"Three things, done well." = "三件事，做到極致。";
+"Find caches, logs, broken installs, and the AI-app history hiding in your library." = "找出快取、日誌、損壞的安裝檔，以及隱藏在資料庫中的 AI App 紀錄。";
+"Drag an app, see every file it dropped, remove all of it. No leftovers." = "拖入一個 App，看到它留下的每個檔案，全部清除。不留殘餘。";
+"Surfaces files that outlived the apps that created them." = "顯示比建立它們的 App 更長壽的檔案。";
+"One permission, then we're done" = "一個權限，就夠了";
+"Permission granted" = "已授予權限";
+"PureMac can now reach the locations macOS protects by default." = "PureMac 現在可以存取 macOS 預設保護的位置。";
+"macOS hides certain folders from every app until you say otherwise. We need them to find caches and uninstall cleanly." = "在你允許之前，macOS 對所有 App 隱藏某些檔案夾。我們需要它們才能找到快取並乾淨地解除安裝。";
+"All set — moving you to the next step." = "一切就緒 - 進入下一步。";
+"Reveal app again" = "再次顯示 App";
+"Reset permissions" = "重設權限";
+"You're ready" = "已準備就緒";
+"Ready when you are" = "隨時為你準備好";
+"Hit Start to run your first Smart Scan." = "按開始執行你的第一次智慧掃描。";
+"Skip" = "略過";
+"Start" = "開始";
+"Continue" = "繼續";

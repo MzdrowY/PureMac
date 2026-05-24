@@ -17,19 +17,11 @@ struct PermissionSheet: View {
             Divider().opacity(0.4)
             footer
         }
-        .frame(width: 560)
-        .background(
-            ZStack {
-                Color(nsColor: .windowBackgroundColor)
-                LinearGradient(
-                    colors: [Tint.blue.opacity(0.06), Tint.purple.opacity(0.04), .clear],
-                    startPoint: .topLeading, endPoint: .bottomTrailing
-                )
-            }
-        )
+        .frame(width: 540)
+        .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
-            withAnimation(.easeOut(duration: 0.5)) { appeared = true }
-            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+            withAnimation(.easeOut(duration: 0.4)) { appeared = true }
+            withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
                 pulse = true
             }
         }
@@ -40,22 +32,12 @@ struct PermissionSheet: View {
     private var header: some View {
         HStack(spacing: 14) {
             ZStack {
+                let tint = coordinator.hasFullDiskAccess ? Tint.green : Tint.blue
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: coordinator.hasFullDiskAccess
-                                ? [Tint.green, Color(red: 0.10, green: 0.65, blue: 0.40)]
-                                : [Tint.blue, Tint.purple],
-                            startPoint: .topLeading, endPoint: .bottomTrailing
-                        )
-                    )
-                    .frame(width: 44, height: 44)
-                    .shadow(
-                        color: (coordinator.hasFullDiskAccess ? Tint.green : Tint.blue)
-                            .opacity(pulse ? 0.45 : 0.15),
-                        radius: pulse ? 14 : 6
-                    )
+                    .fill(tint.opacity(0.14))
+                    .frame(width: 40, height: 40)
                 headerIcon
+                    .foregroundStyle(tint)
             }
 
             VStack(alignment: .leading, spacing: 2) {
@@ -80,8 +62,7 @@ struct PermissionSheet: View {
     private var headerIcon: some View {
         let name = coordinator.hasFullDiskAccess ? "checkmark.shield.fill" : "lock.shield.fill"
         let base = Image(systemName: name)
-            .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(.white)
+            .font(.system(size: 18, weight: .semibold))
         if #available(macOS 14.0, *) {
             base.contentTransition(.symbolEffect(.replace))
         } else {
@@ -102,38 +83,18 @@ struct PermissionSheet: View {
 
     private var requestBody: some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Primary action row
+            // Primary action — use the system's borderedProminent so the
+            // button feels native rather than like a marketing CTA.
             Button {
                 coordinator.openSettingsAndReveal()
             } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "gear.badge")
-                        .font(.system(size: 18, weight: .semibold))
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Open Settings & reveal PureMac")
-                            .font(.system(size: 13.5, weight: .semibold))
-                        Text("We'll open both windows side-by-side.")
-                            .font(.system(size: 11))
-                            .opacity(0.85)
-                    }
-                    Spacer()
-                    Image(systemName: "arrow.up.right")
-                        .font(.system(size: 11, weight: .bold))
-                        .opacity(0.7)
-                }
-                .foregroundStyle(.white)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(
-                    LinearGradient(
-                        colors: [Tint.blue, Tint.purple],
-                        startPoint: .leading, endPoint: .trailing
-                    )
-                )
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .shadow(color: Tint.blue.opacity(0.35), radius: 10, y: 4)
+                Label("Open Settings & reveal PureMac", systemImage: "gear")
+                    .font(.system(size: 13, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
             .keyboardShortcut(.defaultAction)
 
             // Step-by-step strip
