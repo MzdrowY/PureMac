@@ -48,3 +48,6 @@ build/
 
 # Work files (local only)
 _work/
+
+# Local handoff notes (never committed)
+HANDOFF.md
