@@ -155,6 +155,15 @@ final class AppState: ObservableObject {
     }
 
     func removeSelectedFiles() {
+        // Re-entrance guard: if a previous removal is still resolving and
+        // the FDA sheet hasn't dismissed yet, a second call would race-
+        // overwrite `lastFailedRemovalURLs` before the first batch's retry
+        // closure read it. Refuse the new request until the user dismisses
+        // (or grants and retries) the active sheet.
+        guard !removalNeedsFullDiskAccess else {
+            Logger.shared.log("Refused duplicate removeSelectedFiles while FDA prompt is active", level: .info)
+            return
+        }
         // Safety guard: never allow a high-risk home dotpath (listed in
         // Conditions.swift) to be trashed no matter how it ended up in the
         // selection. Catches selection-time additions that slipped past the

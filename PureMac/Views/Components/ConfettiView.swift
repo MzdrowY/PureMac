@@ -18,8 +18,10 @@ struct ConfettiView: NSViewRepresentable {
 
     func makeNSView(context: Context) -> NSView {
         let host = HostingView()
+        // wantsLayer alone gives AppKit a properly-scaled CALayer with the
+        // window's backing-store scale. Assigning a bare CALayer here would
+        // overwrite that and render particles at 1x on Retina displays.
         host.wantsLayer = true
-        host.layer = CALayer()
         return host
     }
 
@@ -48,11 +50,18 @@ struct ConfettiView: NSViewRepresentable {
 
             // Stop emission after a short burst — particles already in flight
             // continue falling and clean up via removeFromSuperlayer below.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) {
-                emitter.birthRate = 0
+            // The `[weak self, weak emitter]` capture lets a torn-down view
+            // skip the work entirely so we don't keep allocating particles
+            // against an orphaned layer.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self, weak emitter] in
+                guard self?.window != nil else {
+                    emitter?.removeFromSuperlayer()
+                    return
+                }
+                emitter?.birthRate = 0
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                emitter.removeFromSuperlayer()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) { [weak emitter] in
+                emitter?.removeFromSuperlayer()
             }
         }
 

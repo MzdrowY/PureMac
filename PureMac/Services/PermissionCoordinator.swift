@@ -66,10 +66,14 @@ final class PermissionCoordinator: ObservableObject {
         failedPaths: [String] = [],
         onGranted: @escaping () -> Void
     ) {
-        // Drop the previous callback before installing the new one so its
-        // captured state can be released. Without this, a stuck first
-        // callback holds AppState slices we just superseded.
+        // Drop the previous callback AND cancel any pending grant work
+        // before installing the new one. Without the cancel, a second
+        // requestAccess() during the 1-second post-grant delay would fire
+        // both callbacks — the queued one for the prior batch plus the
+        // new one we're installing here.
         onGrantCallback = nil
+        pendingGrantWork?.cancel()
+        pendingGrantWork = nil
 
         self.context = context
         self.failedItemPaths = failedPaths

@@ -435,13 +435,15 @@ private struct ReadyScene: View {
                     // Fire the welcome confetti exactly once per install.
                     // Subsequent onboarding re-entries (e.g. after a Reset)
                     // get a clean ready scene without the celebration.
+                    // hasSeenConfetti is recorded the moment the burst
+                    // fires (not after it finishes) so a fast user who
+                    // clicks Start within the first second still gets the
+                    // once-per-install guarantee.
                     guard !hasSeenConfetti else { return }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
                         fireConfetti = true
-                        Haptics.success()
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
                         hasSeenConfetti = true
+                        Haptics.success()
                     }
                 }
 

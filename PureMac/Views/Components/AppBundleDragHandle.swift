@@ -50,16 +50,16 @@ struct AppBundleDragHandle: View {
         .padding(12)
         .onHover { hovering = $0 }
         .help("Drag this icon into the Full Disk Access list in System Settings.")
-        // Standard file-drag pipeline. `NSItemProvider(contentsOf:)` infers
-        // the right uniform type (com.apple.application-bundle for an .app)
-        // and exposes the URL as a file representation — exactly what
-        // System Settings' FDA pane expects from a Finder drop.
+        // NSItemProvider(object: NSURL) is exactly what Finder emits when
+        // you drag an .app — it exposes both the file representation and
+        // the URL string under public.file-url, which is the shape System
+        // Settings' Privacy panes are built to receive. `contentsOf:` works
+        // too but registers as a generic file copy operation; Settings'
+        // FDA list reads the URL representation directly.
         .onDrag {
-            if let provider = NSItemProvider(contentsOf: bundleURL) {
-                provider.suggestedName = bundleURL.lastPathComponent
-                return provider
-            }
-            return NSItemProvider()
+            let provider = NSItemProvider(object: bundleURL as NSURL)
+            provider.suggestedName = bundleURL.lastPathComponent
+            return provider
         }
     }
 
