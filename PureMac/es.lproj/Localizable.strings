@@ -330,3 +330,8 @@
 "Drag this icon into the Full Disk Access list in System Settings." = "Arrastra este icono a la lista de Acceso a Todo el Disco en Ajustes del Sistema.";
 "Tip: drag the icon on the left straight into the list." = "Consejo: arrastra el icono de la izquierda directamente a la lista.";
 "Or drag the icon on the left straight into Settings." = "O arrastra el icono de la izquierda directamente a Ajustes.";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "Composición del almacenamiento";
+"total" = "total";
+"Free" = "Libre";

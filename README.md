@@ -73,7 +73,7 @@ Most Mac cleaners are subscription apps that hide their disk usage behind a payw
 ## What it does
 
 ### App Uninstaller
-Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped on your disk. Three sensitivity tiers - Strict, Enhanced, Deep - let you choose how aggressive that match is. Apple system apps are excluded from the uninstall list automatically.
+Discovers everything in `/Applications` and `~/Applications`, then uses a 10-level matching engine (bundle ID, team identifier, entitlements, Spotlight metadata, container discovery, company-name heuristics, partial path matches) to find every file the app dropped on your disk. Three sensitivity tiers - Strict, Enhanced, Deep - let you choose how aggressive that match is. Apple system apps are excluded from the uninstall list automatically. You can also right-click any app in Finder and choose **Services → Uninstall with PureMac** to jump straight into its related-files scan.
 
 ### Orphan Finder
 Walks `~/Library` and surfaces files left behind by apps that no longer exist on disk. The matcher compares against bundle identifiers and normalized names of every installed app, so a leftover `~/Library/Containers/com.foo.bar` from an app you deleted in 2022 shows up clearly.
@@ -106,6 +106,23 @@ What PureMac does *not* do:
 - It does not collect telemetry, crash reports, or usage analytics.
 - It does not require a network connection to operate.
 - It does not move data anywhere except the Trash and `diskutil`'s APFS purge command.
+
+## Troubleshooting
+
+### Launchpad / Dock shows a stale or dull PureMac icon
+
+macOS aggressively caches app icons in LaunchServices. After a Homebrew **reinstall or upgrade** the Dock and Launchpad can keep showing the old cached icon. PureMac's cask now runs `lsregister -f` on install to refresh it automatically, but if a stale icon persists, reset the cache manually:
+
+```bash
+# Clear the icon caches and rebuild the LaunchServices database
+sudo rm -rfv /Library/Caches/com.apple.iconservices.store
+sudo find /private/var/folders/ \( -name com.apple.dock.iconcache -or -name com.apple.iconservices \) -exec rm -rfv {} \; 2>/dev/null
+/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/Support/lsregister \
+  -kill -r -domain local -domain user -domain system
+killall Dock; killall Finder
+```
+
+Give it a minute to re-seed, then open PureMac once. If it still sticks, a restart (or Safe Mode boot) forces a full rebuild.
 
 ## Screenshots
 

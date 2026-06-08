@@ -98,10 +98,26 @@ struct AppListView: View {
                     .width(ideal: 70)
                 }
                 .onChange(of: selection) { newValue in
-                    if let id = newValue,
-                       let app = appState.installedApps.first(where: { $0.id == id }) {
-                        appState.selectedApp = app
-                        appState.scanForAppFiles(app)
+                    guard let id = newValue,
+                          let app = appState.installedApps.first(where: { $0.id == id })
+                    else { return }
+                    // Skip when the selection was just synced from an external
+                    // (Finder Services) hand-off that already scanned this app,
+                    // so we don't fire a redundant second scan.
+                    guard appState.selectedApp?.id != app.id else { return }
+                    appState.selectedApp = app
+                    appState.scanForAppFiles(app)
+                }
+                .onChange(of: appState.selectedApp) { app in
+                    // Reflect an externally-driven selection (Finder Services)
+                    // in the table highlight.
+                    if selection != app?.id { selection = app?.id }
+                }
+                .onAppear {
+                    // Sync the highlight when this view mounts already pointed
+                    // at an externally-selected app.
+                    if selection != appState.selectedApp?.id {
+                        selection = appState.selectedApp?.id
                     }
                 }
             }

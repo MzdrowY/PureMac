@@ -24,6 +24,22 @@ struct MainWindow: View {
             appState.checkFullDiskAccess()
             permission.refreshStatus()
         }
+        .onChange(of: appState.pendingExternalApp) { app in
+            // A right-clicked app arrived via Finder Services — surface the
+            // Installed Apps view so its related-files scan is visible.
+            guard app != nil else { return }
+            selectedSection = .apps
+            appState.pendingExternalApp = nil
+        }
+        .onAppear {
+            // Covers a request that landed before MainWindow mounted (cold
+            // launch, or while onboarding was still showing) — onChange alone
+            // fires only on subsequent changes and would miss it.
+            if appState.pendingExternalApp != nil {
+                selectedSection = .apps
+                appState.pendingExternalApp = nil
+            }
+        }
         .onChange(of: appState.cleanErrorIsFDAFixable) { isFDAFixable in
             // Auto-route FDA-fixable clean errors straight into the rich
             // sheet — skip the generic alert entirely so the user gets

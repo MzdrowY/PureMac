@@ -330,3 +330,8 @@
 "Drag this icon into the Full Disk Access list in System Settings." = "اسحب هذه الأيقونة إلى قائمة الوصول الكامل للقرص في إعدادات النظام.";
 "Tip: drag the icon on the left straight into the list." = "نصيحة: اسحب الأيقونة على اليسار مباشرةً إلى القائمة.";
 "Or drag the icon on the left straight into Settings." = "أو اسحب الأيقونة على اليسار مباشرةً إلى الإعدادات.";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "تكوين مساحة التخزين";
+"total" = "الإجمالي";
+"Free" = "متاح";

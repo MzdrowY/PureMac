@@ -36,5 +36,25 @@
 	<string>PureMac needs system administration access to clean caches and uninstall apps completely.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>PureMac uses Apple Events to interact with Finder when revealing files.</string>
+	<key>NSServices</key>
+	<array>
+		<dict>
+			<key>NSMenuItem</key>
+			<dict>
+				<key>default</key>
+				<string>Uninstall with PureMac</string>
+			</dict>
+			<key>NSMessage</key>
+			<string>uninstallApp</string>
+			<key>NSPortName</key>
+			<string>PureMac</string>
+			<key>NSRequiredContext</key>
+			<dict/>
+			<key>NSSendFileTypes</key>
+			<array>
+				<string>com.apple.application-bundle</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

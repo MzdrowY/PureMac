@@ -9,6 +9,34 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Touch TCC-protected paths so macOS registers PureMac in the
         // Full Disk Access pane on first launch (fixes issue #75).
         FullDiskAccessManager.shared.triggerRegistration()
+        // Register the Finder Services provider so "Uninstall with PureMac"
+        // appears when an .app bundle is right-clicked (issue #109).
+        NSApp.servicesProvider = self
+        NSUpdateDynamicServices()
+    }
+
+    /// Finder Services entry point. Declared in Info.plist as NSMessage
+    /// `uninstallApp`; receives the right-clicked .app via the pasteboard and
+    /// hands it to AppState through a notification. Brings PureMac forward so
+    /// the user lands on the uninstall scan.
+    @objc func uninstallApp(_ pboard: NSPasteboard,
+                            userData: String?,
+                            error: AutoreleasingUnsafeMutablePointer<NSString>?) {
+        let urls = (pboard.readObjects(forClasses: [NSURL.self],
+                                       options: [.urlReadingFileURLsOnly: true]) as? [URL]) ?? []
+        guard let appURL = urls.first(where: { $0.pathExtension == "app" }) else {
+            error?.pointee = "Select an application (.app) to uninstall." as NSString
+            return
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        // Buffer the path for the cold-launch case (AppState may not exist yet,
+        // and NotificationCenter does not replay); AppState drains it in init.
+        ExternalUninstallBuffer.pendingPath = appURL.path
+        NotificationCenter.default.post(
+            name: .pureMacExternalUninstall,
+            object: nil,
+            userInfo: ["path": appURL.path]
+        )
     }
 }
 

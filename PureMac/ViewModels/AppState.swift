@@ -11,6 +11,22 @@ enum AppSection: Hashable {
     case cleaning(CleaningCategory)
 }
 
+extension Notification.Name {
+    /// Posted by the Finder Services handler ("Uninstall with PureMac") with a
+    /// `["path": String]` userInfo pointing at the right-clicked .app bundle.
+    static let pureMacExternalUninstall = Notification.Name("PureMac.ExternalUninstall")
+}
+
+/// Cold-launch buffer for Finder Services. A "Uninstall with PureMac" request
+/// can arrive before the SwiftUI scene (and thus AppState) exists; the posted
+/// notification then has no subscriber and is lost (NotificationCenter has no
+/// replay). AppDelegate stashes the path here and AppState drains it in init.
+enum ExternalUninstallBuffer {
+    // Written by the Finder Services handler and drained by AppState — both
+    // run on the main thread, so a plain static is sufficient here.
+    static var pendingPath: String?
+}
+
 @MainActor
 final class AppState: ObservableObject {
     typealias AppFileScanner = @MainActor (
@@ -64,6 +80,13 @@ final class AppState: ObservableObject {
     /// different app or mutates selection while the FDA sheet is open.
     @Published var lastFailedRemovalURLs: [URL] = []
     @Published var appFileScanLocationCount: Int = 0
+    /// Set when a right-clicked app arrives via the Finder Services handler.
+    /// MainWindow consumes it on both onChange AND onAppear so a request that
+    /// lands before MainWindow mounts (cold launch, or while onboarding is
+    /// still showing) is still surfaced — a one-shot token would be missed.
+    @Published var pendingExternalApp: InstalledApp?
+
+    private var externalUninstallObserver: AnyCancellable?
 
     // MARK: - Services
 
@@ -108,6 +131,24 @@ final class AppState: ObservableObject {
         self.locationsProvider = locationsProvider
         self.appFileScanner = appFileScanner
 
+        // Listen for right-click "Uninstall with PureMac" hand-offs from the
+        // Finder Services handler in AppDelegate.
+        externalUninstallObserver = NotificationCenter.default
+            .publisher(for: .pureMacExternalUninstall)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] note in
+                let path = (note.userInfo?["path"] as? String) ?? ExternalUninstallBuffer.pendingPath
+                ExternalUninstallBuffer.pendingPath = nil
+                guard let path else { return }
+                Task { @MainActor in self?.presentExternalUninstall(appPath: path) }
+            }
+        // Drain a request that arrived before this AppState existed (cold launch
+        // via Finder Services — the notification fired with no subscriber).
+        if let buffered = ExternalUninstallBuffer.pendingPath {
+            ExternalUninstallBuffer.pendingPath = nil
+            presentExternalUninstall(appPath: buffered)
+        }
+
         if performStartupTasks {
             loadDiskInfo()
             checkFullDiskAccess()
@@ -136,6 +177,38 @@ final class AppState: ObservableObject {
                 self?.isLoadingApps = false
             }
         }
+    }
+
+    /// Resolve a right-clicked .app (via the Finder Services handler) into the
+    /// uninstaller: select it, kick off the related-files scan, and signal
+    /// MainWindow to surface the Installed Apps section.
+    func presentExternalUninstall(appPath: String) {
+        let url = URL(fileURLWithPath: appPath)
+        if let cached = installedApps.first(where: { $0.path.standardizedFileURL == url.standardizedFileURL }) {
+            applyExternalUninstall(cached)
+            return
+        }
+        // Not in the cached list (non-standard location, or a cold start before
+        // loadInstalledApps finished). Resolve off the main thread — fetchApp
+        // walks the entire bundle to size it, which would beachball the UI for
+        // a multi-gigabyte app.
+        Task.detached(priority: .userInitiated) {
+            let app = AppInfoFetcher.shared.fetchApp(at: url)
+            await MainActor.run { [weak self] in
+                guard let self else { return }
+                guard let app else {
+                    Logger.shared.log("Finder uninstall request rejected (non-app or protected): \(appPath)", level: .warning)
+                    return
+                }
+                self.applyExternalUninstall(app)
+            }
+        }
+    }
+
+    private func applyExternalUninstall(_ app: InstalledApp) {
+        selectedApp = app
+        pendingExternalApp = app
+        scanForAppFiles(app)
     }
 
     func scanForAppFiles(_ app: InstalledApp) {

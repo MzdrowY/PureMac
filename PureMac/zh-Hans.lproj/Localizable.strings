@@ -330,3 +330,8 @@
 "Drag this icon into the Full Disk Access list in System Settings." = "将此图标拖入系统设置中的完整磁盘访问列表。";
 "Tip: drag the icon on the left straight into the list." = "提示：把左侧图标直接拖入列表。";
 "Or drag the icon on the left straight into Settings." = "或者把左侧图标直接拖入设置。";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "存储构成";
+"total" = "总计";
+"Free" = "可用";

@@ -330,3 +330,8 @@
 "Drag this icon into the Full Disk Access list in System Settings." = "このアイコンをシステム設定のフルディスクアクセスのリストにドラッグしてください。";
 "Tip: drag the icon on the left straight into the list." = "ヒント: 左のアイコンをそのままリストにドラッグできます。";
 "Or drag the icon on the left straight into Settings." = "または左のアイコンをそのまま設定にドラッグしてください。";
+
+/* Dashboard storage composition (v2.7.0) */
+"Storage composition" = "ストレージの内訳";
+"total" = "合計";
+"Free" = "空き";

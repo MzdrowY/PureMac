@@ -18,6 +18,10 @@ struct DashboardView: View {
                     case .idle:
                         hero
                         stats
+                        if appState.diskInfo.totalSpace > 0 {
+                            sectionHeader("Storage composition")
+                            storageComposition
+                        }
                         if !suggestionRows.isEmpty {
                             sectionHeader("Suggested for you")
                             suggestions
@@ -32,6 +36,7 @@ struct DashboardView: View {
                         completedHero
                         if appState.totalJunkSize > 0 {
                             sectionHeader("By category")
+                            categoryChartCard
                             resultsList
                         }
                     case .cleaning:
@@ -96,7 +101,7 @@ struct DashboardView: View {
 
         return CardSurface(padding: 24, accent: stress ? Tint.orange : Tint.blue, elevation: .raised) {
             HStack(alignment: .center, spacing: 28) {
-                StorageGauge(percentUsed: percentUsed)
+                HealthRing(percent: percentUsed)
                     .frame(width: 180, height: 180)
 
                 VStack(alignment: .leading, spacing: 14) {
@@ -212,6 +217,7 @@ struct DashboardView: View {
                 value: ByteCountFormatter.string(fromByteCount: free, countStyle: .file),
                 delta: total > 0 ? freeSpaceDelta(total: total, percentUsed: percentUsed) : nil
             )
+            .staggered(0)
             StatCard(
                 icon: "trash.circle.fill",
                 tint: Tint.orange,
@@ -223,6 +229,7 @@ struct DashboardView: View {
                     ? String(localized: "Run a scan")
                     : junkFoundDelta(count: appState.allResults.count)
             )
+            .staggered(1)
             StatCard(
                 icon: "square.grid.2x2.fill",
                 tint: Tint.purple,
@@ -230,6 +237,7 @@ struct DashboardView: View {
                 value: "\(appState.installedApps.count)",
                 delta: String(localized: "installed")
             )
+            .staggered(2)
             StatCard(
                 icon: "memorychip.fill",
                 tint: Tint.green,
@@ -239,6 +247,7 @@ struct DashboardView: View {
                     : "—",
                 delta: String(localized: "APFS reclaimable")
             )
+            .staggered(3)
         }
     }
 
@@ -254,12 +263,66 @@ struct DashboardView: View {
         String(format: String(localized: "across %lld categories"), Int64(count))
     }
 
+    // MARK: - Storage composition
+
+    private var storageComposition: some View {
+        let total = appState.diskInfo.totalSpace
+        let free = appState.diskInfo.freeSpace
+        let purge = max(0, appState.diskInfo.purgeableSpace)
+        let junk = max(0, min(appState.totalJunkSize, appState.diskInfo.usedSpace))
+        // "Used" excludes the junk + purgeable slices so the four segments sum
+        // to the whole disk without double-counting.
+        let usedCore = max(0, appState.diskInfo.usedSpace - junk - purge)
+
+        var segments: [StorageDonut.Segment] = []
+        func add(_ id: String, _ value: Int64, _ color: Color, _ label: LocalizedStringKey) {
+            guard value > 0 else { return }
+            segments.append(.init(
+                id: id,
+                value: Double(value),
+                color: color,
+                label: label,
+                display: ByteCountFormatter.string(fromByteCount: value, countStyle: .file)
+            ))
+        }
+        add("used", usedCore, Tint.blue, "Used")
+        add("junk", junk, Tint.orange, "Junk")
+        add("purgeable", purge, Tint.green, "Purgeable")
+        add("free", free, Color.primary.opacity(0.14), "Free")
+
+        return CardSurface(padding: 18, elevation: .standard) {
+            HStack(alignment: .center, spacing: 24) {
+                ZStack {
+                    StorageDonut(segments: segments)
+                        .frame(width: 132, height: 132)
+                    VStack(spacing: 1) {
+                        Text(ByteCountFormatter.string(fromByteCount: total, countStyle: .file))
+                            .font(.system(size: 17, weight: .bold))
+                            .monospacedDigit()
+                        Text("total")
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                VStack(alignment: .leading, spacing: 12) {
+                    ForEach(Array(segments.enumerated()), id: \.element.id) { idx, seg in
+                        LegendChip(color: seg.color, label: seg.label, value: seg.display)
+                            .staggered(idx)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
     // MARK: - Suggestions
 
     private var suggestions: some View {
         VStack(spacing: 10) {
-            ForEach(suggestionRows) { row in
+            ForEach(Array(suggestionRows.enumerated()), id: \.offset) { idx, row in
                 SuggestionRow(suggestion: row)
+                    .staggered(idx)
             }
         }
     }
@@ -409,11 +472,24 @@ struct DashboardView: View {
         )
     }
 
+    private var categoryChartCard: some View {
+        let bars = appState.allResults
+            .filter { $0.totalSize > 0 }
+            .sorted { $0.totalSize > $1.totalSize }
+            .prefix(8)
+            .map { CategoryBarChart.Bar(category: $0.category, size: $0.totalSize) }
+
+        return CardSurface(padding: 18, elevation: .standard) {
+            CategoryBarChart(bars: Array(bars))
+        }
+    }
+
     private var resultsList: some View {
         CardSurface(padding: 0) {
             VStack(spacing: 0) {
-                ForEach(appState.allResults) { result in
+                ForEach(Array(appState.allResults.enumerated()), id: \.element.id) { idx, result in
                     CategoryToggleRow(result: result)
+                        .staggered(idx)
                     if result.id != appState.allResults.last?.id {
                         Divider().padding(.leading, 54)
                     }
@@ -429,18 +505,6 @@ struct DashboardView: View {
             .foregroundStyle(Tint.green)
         if #available(macOS 14.0, *) {
             base.symbolEffect(.bounce, value: appState.totalJunkSize)
-        } else {
-            base
-        }
-    }
-
-    @ViewBuilder
-    private var bigCheckmark: some View {
-        let base = Image(systemName: "checkmark")
-            .font(.system(size: 54, weight: .semibold))
-            .foregroundStyle(Tint.green)
-        if #available(macOS 14.0, *) {
-            base.symbolEffect(.bounce, value: appState.totalFreedSpace)
         } else {
             base
         }
@@ -485,12 +549,7 @@ struct DashboardView: View {
     private var cleanedHero: some View {
         CardSurface(padding: 24, accent: Tint.green, elevation: .raised) {
             HStack(alignment: .center, spacing: 28) {
-                ZStack {
-                    Circle()
-                        .fill(Tint.green.opacity(0.12))
-                    bigCheckmark
-                }
-                .frame(width: 120, height: 120)
+                SuccessMedal()
 
                 VStack(alignment: .leading, spacing: 6) {
                     Text(ByteCountFormatter.string(fromByteCount: appState.totalFreedSpace, countStyle: .file))
@@ -594,39 +653,6 @@ private struct SuggestionRow: View {
 }
 
 // MARK: - Gauges
-
-private struct StorageGauge: View {
-    let percentUsed: Double  // 0...1
-
-    var body: some View {
-        let pct = max(0, min(1, percentUsed))
-        let displayPercent = Int(round(pct * 100))
-        let stress = pct > 0.85
-        let arcColor: Color = stress ? Tint.orange : Tint.blue
-
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.07), lineWidth: 10)
-
-            Circle()
-                .trim(from: 0, to: CGFloat(pct))
-                .stroke(arcColor, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                .rotationEffect(.degrees(-90))
-                .animation(.easeOut(duration: 0.7), value: pct)
-
-            VStack(spacing: 2) {
-                Text("\(displayPercent)%")
-                    .font(.system(size: 44, weight: .semibold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text("USED")
-                    .font(.system(size: 10, weight: .medium))
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
-            }
-        }
-    }
-}
 
 private struct LegendDot: View {
     let color: Color
