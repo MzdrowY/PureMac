@@ -1,5 +1,9 @@
 <p align="center">
-  <img src="screenshot.png" alt="PureMac" width="700">
+  <img src="screenshot.png" alt="PureMac dashboard — animated storage health ring and live composition donut" width="820">
+</p>
+
+<p align="center">
+  <img src="screenshots/breakdown.png" alt="PureMac scan results — by-category breakdown chart" width="820">
 </p>
 
 <p align="center">
