@@ -302,7 +302,7 @@ struct DashboardView: View {
                 value: appState.diskInfo.purgeableSpace > 0
                     ? ByteCountFormatter.string(fromByteCount: appState.diskInfo.purgeableSpace, countStyle: .file)
                     : "—",
-                delta: String(localized: "APFS reclaimable"),
+                delta: String(localized: "Managed by macOS"),
                 byteValue: appState.diskInfo.purgeableSpace > 0 ? appState.diskInfo.purgeableSpace : nil
             )
             .staggered(3)

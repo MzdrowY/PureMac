@@ -999,9 +999,9 @@ final class AppState: ObservableObject {
             cleanAll()
         }
 
-        if scheduler.config.autoPurge {
-            _ = await cleaningEngine.purgePurgeableSpace()
-        }
+        // Purgeable space is intentionally NOT auto-purged: macOS reserves and
+        // reclaims it on its own and PureMac does not claim to free it. See
+        // CleaningCategory.scannable.
 
         if scheduler.config.notifyOnCompletion {
             sendNotification(freed: totalFound)

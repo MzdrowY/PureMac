@@ -347,3 +347,7 @@
 "Other Files" = "Otros archivos";
 "Sound" = "Sonido";
 "Play sound effects" = "Reproducir efectos de sonido";
+
+/* v2.8.1: purgeable honesty */
+"Managed by macOS" = "Gestionado por macOS";
+"Reserved by macOS - freed automatically when space is needed" = "Reservado por macOS - se libera automáticamente cuando se necesita espacio";

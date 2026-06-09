@@ -347,3 +347,7 @@
 "Other Files" = "その他のファイル";
 "Sound" = "サウンド";
 "Play sound effects" = "効果音を再生";
+
+/* v2.8.1: purgeable honesty */
+"Managed by macOS" = "macOS が管理";
+"Reserved by macOS - freed automatically when space is needed" = "macOS が予約 - 空き容量が必要になると自動的に解放されます";

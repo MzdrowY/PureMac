@@ -207,7 +207,6 @@ struct ScheduleSettingsView: View {
                         }
 
                         Toggle("Auto-clean after scan", isOn: $appState.scheduler.config.autoClean)
-                        Toggle("Auto-purge purgeable space", isOn: $appState.scheduler.config.autoPurge)
                         Toggle("Notify on completion", isOn: $appState.scheduler.config.notifyOnCompletion)
 
                         HStack {

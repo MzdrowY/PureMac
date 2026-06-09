@@ -25,7 +25,8 @@
 <p align="center">
   <a href="https://github.com/momenbasel/PureMac/releases/latest"><img src="https://img.shields.io/github/v/release/momenbasel/PureMac?style=flat-square&label=Download" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/macOS-13.0+-blue?style=flat-square" alt="macOS 13.0+">
-  <img src="https://img.shields.io/badge/Swift-5.9-orange?style=flat-square" alt="Swift 5.9">
+  <img src="https://img.shields.io/badge/Signed%20%26%20Notarized-Apple-success?style=flat-square" alt="Signed & Notarized by Apple">
+  <img src="https://img.shields.io/badge/telemetry-none-success?style=flat-square" alt="No telemetry">
   <a href="LICENSE"><img src="https://img.shields.io/github/license/momenbasel/PureMac?style=flat-square" alt="MIT License"></a>
   <a href="https://github.com/momenbasel/PureMac/stargazers"><img src="https://img.shields.io/github/stars/momenbasel/PureMac?style=flat-square" alt="Stars"></a>
   <a href="https://github.com/momenbasel/PureMac/releases"><img src="https://img.shields.io/github/downloads/momenbasel/PureMac/total?style=flat-square&label=Downloads" alt="Downloads"></a>
@@ -34,9 +35,10 @@
 <p align="center">
   <a href="#install">Install</a> -
   <a href="#why-this-exists">Why this exists</a> -
+  <a href="#how-it-compares">How it compares</a> -
+  <a href="#our-promise">Our promise</a> -
   <a href="#what-it-does">What it does</a> -
   <a href="#permissions">Permissions</a> -
-  <a href="#screenshots">Screenshots</a> -
   <a href="#contributing">Contributing</a>
 </p>
 
@@ -61,6 +63,35 @@ xcodebuild -project PureMac.xcodeproj -scheme PureMac -configuration Release \
   -derivedDataPath build build
 open build/Build/Products/Release/PureMac.app
 ```
+
+## How it compares
+
+|  | **PureMac** | CleanMyMac | Pearcleaner | Mole | OnyX |
+|---|:---:|:---:|:---:|:---:|:---:|
+| Price | **Free** | $40+/yr | Free | CLI free / GUI paid | Free |
+| Open source | **Yes (MIT)** | No | Source-available¹ | CLI only | No |
+| Native Mac GUI | **Yes** | Yes | Yes | Terminal-first | Yes |
+| No telemetry | **Yes** | No | Yes | Yes | Yes |
+| No subscription | **Yes** | No | Yes | — | Yes |
+| Signed + notarized | **Yes** | Yes | Yes | — | Yes |
+| App uninstaller + orphans | **Yes** | Yes | Yes | Partial | No |
+| Trash-only (recoverable) | **Yes** | Partial | Yes | Partial | No |
+| Honest about purgeable space | **Yes** | No | n/a | n/a | n/a |
+
+<sub>¹ Pearcleaner is Apache 2.0 **+ Commons Clause** - source-available but not OSI-approved (you may not sell it). PureMac is true MIT. Comparison reflects publicly documented features as of 2026; corrections welcome via PR.</sub>
+
+## Our promise
+
+A Mac cleaner asks for the deepest permission macOS grants - Full Disk Access - and then deletes your files. That demands a level of trust the category has spent twenty years burning. Here's the contract PureMac holds itself to, and you can verify every line of it in the source:
+
+- **Trash, never `rm`.** Everything PureMac removes goes to the Trash via `FileManager.trashItem`. If it was wrong, you drag it back. Nothing is shredded or unlinked.
+- **No telemetry, ever.** No analytics, no crash reporting, no "anonymous usage stats," no network calls to us. The app doesn't know you exist.
+- **No fake urgency.** No dramatized "47 GB of junk detected!" badge, no red alarm counters, no "your Mac is at risk." We show you neutral facts and let you decide.
+- **No overpromising.** We don't claim to "reclaim purgeable space," "boost RAM," or "speed up your Mac" - things no app can reliably do. See the purgeable-space note below.
+- **You review before anything is removed.** Nothing is auto-deleted. Every item shows its real path with Reveal-in-Finder, and high-risk system paths are hard-excluded in code.
+- **Auditable.** It's MIT. The exact code that decides what gets removed is in [`PureMac/Services`](PureMac/Services) and [`PureMac/Logic/Scanning`](PureMac/Logic/Scanning). Read it. Fork it. Ship your own.
+
+If PureMac ever adds telemetry, a paywall on core features, or a fear-based scan, it will have become the thing it was built to replace. Hold us to this.
 
 ## Why this exists
 
@@ -91,11 +122,12 @@ Smart Scan runs every category in parallel. Each category is its own deliberate 
 - **Mail Files** - downloaded mail attachments
 - **Trash Bins** - empties all bins, including external volumes
 - **Large & Old Files** - >100 MB or older than 1 year (never auto-selected)
-- **Purgeable Space** - reclaims APFS purgeable space via `diskutil`
 - **Xcode Junk** - DerivedData, Archives, simulator caches
 - **Brew Cache** - respects custom `HOMEBREW_CACHE`
 - **Node Cache** - npm, yarn classic, pnpm content-addressable store
 - **Docker Cache** - images, containers, build cache
+
+> **On "purgeable space":** PureMac shows your APFS purgeable space in the storage breakdown for transparency, but it deliberately does **not** list it as junk to delete. Purgeable space is reserved and reclaimed by macOS itself - no third-party app can reliably free it, and even the Finder's purgeable figure is known to be inaccurate. Cleaners that claim to "reclaim purgeable space" are overpromising. We'd rather be honest than impressive.
 
 ### Scheduled Cleaning
 Optional. Configurable interval (hourly to monthly), with auto-clean threshold so background runs only fire when there's something meaningful to remove.
@@ -109,7 +141,7 @@ The first-launch onboarding walks you through granting it with an animated previ
 What PureMac does *not* do:
 - It does not collect telemetry, crash reports, or usage analytics.
 - It does not require a network connection to operate.
-- It does not move data anywhere except the Trash and `diskutil`'s APFS purge command.
+- It does not move data anywhere except the Trash.
 
 ## Troubleshooting
 

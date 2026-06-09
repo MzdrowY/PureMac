@@ -44,7 +44,7 @@ enum CleaningCategory: String, CaseIterable, Identifiable, Codable {
         case .mailAttachments: return "Downloaded mail attachments"
         case .trashBins: return "Files in your Trash"
         case .largeFiles: return "Files over 100 MB or older than 1 year"
-        case .purgeableSpace: return "APFS purgeable disk space"
+        case .purgeableSpace: return "Reserved by macOS - freed automatically when space is needed"
         case .xcodeJunk: return "Derived data, archives, and simulators"
         case .brewCache: return "Homebrew download cache"
         case .nodeCache: return "npm, yarn, and pnpm download caches"
@@ -69,9 +69,16 @@ enum CleaningCategory: String, CaseIterable, Identifiable, Codable {
         }
     }
 
-    // Categories to scan in Smart Scan mode
+    // Categories to scan in Smart Scan mode.
+    //
+    // `purgeableSpace` is deliberately excluded: APFS purgeable space is
+    // reserved and reclaimed by macOS itself — no third-party app can reliably
+    // enumerate or free it, and the Finder's own purgeable figure is known to
+    // be inaccurate. We still SHOW it in the storage breakdown for
+    // transparency, but we never present it as junk PureMac can delete.
+    // Honest > impressive.
     static var scannable: [CleaningCategory] {
-        allCases.filter { $0 != .smartScan }
+        allCases.filter { $0 != .smartScan && $0 != .purgeableSpace }
     }
 }
 

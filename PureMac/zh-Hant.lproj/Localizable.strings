@@ -347,3 +347,7 @@
 "Other Files" = "其他檔案";
 "Sound" = "聲音";
 "Play sound effects" = "播放音效";
+
+/* v2.8.1: purgeable honesty */
+"Managed by macOS" = "由 macOS 管理";
+"Reserved by macOS - freed automatically when space is needed" = "由 macOS 保留 - 需要空間時自動釋放";
