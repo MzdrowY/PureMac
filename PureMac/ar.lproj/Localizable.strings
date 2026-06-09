@@ -335,3 +335,15 @@
 "Storage composition" = "تكوين مساحة التخزين";
 "total" = "الإجمالي";
 "Free" = "متاح";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "التطبيق";
+"Caches" = "ذاكرة التخزين المؤقت";
+"Application Support" = "دعم التطبيقات";
+"Preferences" = "التفضيلات";
+"Logs" = "السجلات";
+"Containers" = "الحاويات";
+"Launch Agents" = "عناصر بدء التشغيل";
+"Other Files" = "ملفات أخرى";
+"Sound" = "الصوت";
+"Play sound effects" = "تشغيل المؤثرات الصوتية";

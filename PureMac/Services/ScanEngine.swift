@@ -4,6 +4,22 @@ actor ScanEngine {
     private let fileManager = FileManager.default
     private let home = FileManager.default.homeDirectoryForCurrentUser.path
 
+    /// Live path reporter for the dashboard's scanning ticker. Throttled so
+    /// a directory with thousands of entries doesn't flood the main actor.
+    private var onPath: (@Sendable (String) -> Void)?
+    private var lastReport = Date.distantPast
+
+    /// `path` is an autoclosure so the String is only materialized after the
+    /// throttle gate passes — a deep home-directory walk enumerates hundreds
+    /// of thousands of entries and only ~12/sec are ever displayed.
+    private func report(_ path: @autoclosure () -> String) {
+        guard let onPath else { return }
+        let now = Date()
+        guard now.timeIntervalSince(lastReport) > 0.08 else { return }
+        lastReport = now
+        onPath(path())
+    }
+
     private struct CleanupTarget {
         let name: String
         let path: String
@@ -20,7 +36,12 @@ actor ScanEngine {
 
     // MARK: - Public API
 
-    func scanCategory(_ category: CleaningCategory) async -> CategoryResult {
+    func scanCategory(
+        _ category: CleaningCategory,
+        onPath: (@Sendable (String) -> Void)? = nil
+    ) async -> CategoryResult {
+        self.onPath = onPath
+        defer { self.onPath = nil }
         switch category {
         case .smartScan:
             return CategoryResult(category: category, items: [], totalSize: 0)
@@ -253,6 +274,7 @@ actor ScanEngine {
             // checkouts) would never see anything past entry 5k — the
             // scattered 100+ MB files were always past that bound.
             for case let fileURL as URL in enumerator {
+                report(fileURL.path)
                 guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]),
                       let isFile = resourceValues.isRegularFile, isFile,
                       let fileSize = resourceValues.fileSize
@@ -686,6 +708,7 @@ actor ScanEngine {
             let contents = try fileManager.contentsOfDirectory(atPath: path)
             for item in contents {
                 let fullPath = (path as NSString).appendingPathComponent(item)
+                report(fullPath)
                 if excludedPaths.contains(normalizePath(fullPath)) {
                     continue
                 }
@@ -740,6 +763,7 @@ actor ScanEngine {
         isSelected: Bool = true,
         minimumSize: Int64 = 1024
     ) -> CleanableItem? {
+        report(path)
         var isDirectory: ObjCBool = false
         guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory),
               fileManager.isReadableFile(atPath: path) else { return nil }
@@ -803,6 +827,7 @@ actor ScanEngine {
             count += 1
             if count > 10000 { break } // Safety limit for very large directories
 
+            report(fileURL.path)
             guard let values = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey]),
                   let isFile = values.isRegularFile, isFile,
                   let size = values.fileSize else { continue }

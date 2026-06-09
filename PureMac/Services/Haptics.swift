@@ -25,6 +25,32 @@ enum Haptics {
         perform(.generic)
     }
 
+    /// Defaults key for the user-facing "Play sound effects" toggle
+    /// (Settings → General). Defaults to on.
+    static let soundEffectsKey = "PureMac.SoundEffects"
+
+    private static var soundEnabled: Bool {
+        UserDefaults.standard.object(forKey: soundEffectsKey) as? Bool ?? true
+    }
+
+    /// Completion beat: haptic + the system "Glass" chime in one call so the
+    /// two always land together. The sound intentionally still plays under
+    /// Reduce Motion — there it stands in for the suppressed confetti.
+    static func successWithSound() {
+        success()
+        if soundEnabled {
+            NSSound(named: "Glass")?.play()
+        }
+    }
+
+    /// Failure beat: haptic + the system "Basso" thud.
+    static func errorWithSound() {
+        generic()
+        if soundEnabled {
+            NSSound(named: "Basso")?.play()
+        }
+    }
+
     private static func perform(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
         NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
     }

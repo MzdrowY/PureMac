@@ -7,8 +7,17 @@ import SwiftUI
 /// `ConfettiView(trigger:)` — each rising edge fires one burst that quiets
 /// itself. Honors Reduce Motion (renders nothing).
 struct ConfettiView: View {
+    enum Mode {
+        /// Pieces spawn above the frame and flutter down (ambient rain).
+        case rain
+        /// Pieces explode radially from a point (anchored celebration —
+        /// pair the origin with the visual element being celebrated).
+        case burst(origin: UnitPoint)
+    }
+
     /// Flip to fire a burst. Each rising edge fires once.
     let trigger: Bool
+    var mode: Mode = .rain
 
     @State private var particles: [Particle] = []
     @State private var start: Date?
@@ -41,7 +50,13 @@ struct ConfettiView: View {
 
     private func fire(in size: CGSize) {
         guard !reduceMotion, size.width > 0 else { return }
-        particles = (0..<90).map { _ in Particle.random(width: size.width) }
+        switch mode {
+        case .rain:
+            particles = (0..<90).map { _ in Particle.random(width: size.width) }
+        case .burst(let origin):
+            let point = CGPoint(x: size.width * origin.x, y: size.height * origin.y)
+            particles = (0..<90).map { _ in Particle.burst(from: point) }
+        }
         start = Date()
         generation += 1
         let g = generation
@@ -123,6 +138,38 @@ private struct Particle {
         Color(red: 1.00, green: 0.46, blue: 0.62),  // pink
         Color(red: 0.36, green: 0.80, blue: 0.94),  // cyan
     ]
+
+    /// Radial explosion from a fixed point. Same physics as the rain mode —
+    /// the polar launch velocity plus the existing gravity term naturally
+    /// produces the arc — with an upward bias so the burst blooms before it
+    /// falls, and an earlier fade so pieces don't litter the screen.
+    static func burst(from point: CGPoint) -> Particle {
+        let shape = ConfettiShape.allCases.randomElement()!
+        let dim: CGSize
+        switch shape {
+        case .streamer: dim = CGSize(width: .random(in: 5...8), height: .random(in: 11...16))
+        case .disc:     dim = CGSize(width: 9, height: .random(in: 7...10))
+        case .ring:     dim = CGSize(width: 10, height: .random(in: 9...13))
+        }
+        let angle = Double.random(in: 0...(2 * .pi))
+        let speed = Double.random(in: 160...340)
+        return Particle(
+            x0: point.x,
+            y0: point.y,
+            vy0: sin(angle) * speed - .random(in: 140...220),
+            gravity: .random(in: 240...340),
+            drift: cos(angle) * speed,
+            swayAmp: .random(in: 4...14),
+            swayFreq: .random(in: 1.4...3.0),
+            phase: .random(in: 0...(2 * .pi)),
+            spin: .random(in: -6...6),
+            tumbleSpeed: .random(in: 2.5...5.5),
+            fadeStart: .random(in: 1.0...1.5),
+            color: palette.randomElement()!,
+            size: dim,
+            shape: shape
+        )
+    }
 
     static func random(width: CGFloat) -> Particle {
         let shape = ConfettiShape.allCases.randomElement()!

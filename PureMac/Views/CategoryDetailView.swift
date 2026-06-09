@@ -7,6 +7,7 @@ struct CategoryDetailView: View {
     @State private var sortDescending: Bool = true
     @State private var searchText = ""
     @State private var showConfirmation = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var result: CategoryResult? {
         appState.categoryResults[category]
@@ -22,12 +23,12 @@ struct CategoryDetailView: View {
             Group {
                 if let result = result {
                     if result.items.isEmpty {
-                        EmptyStateView("All Clean", systemImage: "checkmark.circle", description: "No junk files found in this category.")
+                        EmptyStateView("All Clean", systemImage: "checkmark.circle", description: "No junk files found in this category.", tint: Tint.green)
                     } else {
                         fileList(result)
                     }
                 } else {
-                    EmptyStateView("Not Scanned", systemImage: category.icon, description: "Run a scan to analyze this category.", action: { appState.scanSingleCategory(category) }, actionLabel: "Scan Now")
+                    EmptyStateView("Not Scanned", systemImage: category.icon, description: "Run a scan to analyze this category.", action: { appState.scanSingleCategory(category) }, actionLabel: "Scan Now", tint: category.color)
                 }
             }
         }
@@ -121,8 +122,11 @@ struct CategoryDetailView: View {
                     if itemCount > 0 {
                         Text(itemsAndSizeText(itemCount: itemCount, totalSize: totalSize))
                             .font(.system(size: 11.5, weight: .medium))
+                            .monospacedDigit()
+                            .contentTransition(reduceMotion ? .identity : .numericText())
                             .foregroundStyle(category.color)
                             .padding(.top, 2)
+                            .animation(reduceMotion ? nil : MotionTokens.gentle, value: totalSize)
                     }
                 }
 
@@ -167,7 +171,12 @@ struct CategoryDetailView: View {
         }
         return List {
             Section {
-                ForEach(items) { item in
+                // No .staggered() here: List is lazy, so a delayed-reveal
+                // modifier would blank each row for ~0.45s as it scrolls into
+                // view on large scans. The row hover/selection polish carries
+                // the motion; the list-level sort/filter animation handles
+                // reorders.
+                ForEach(Array(items.enumerated()), id: \.element.id) { _, item in
                     FileRowView(item: item)
                 }
             } header: {
@@ -180,8 +189,15 @@ struct CategoryDetailView: View {
                         Int64(totalCount)
                     )
                 )
+                .monospacedDigit()
+                .contentTransition(reduceMotion ? .identity : .numericText())
+                .animation(reduceMotion ? nil : MotionTokens.gentle, value: selectedCount)
             }
         }
+        // CleanableItem ids are stable, so SwiftUI move-animates re-sorts and
+        // fades filtered rows instead of snapping.
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85), value: sortDescending)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: searchText)
     }
 
     private func sortedItems(_ items: [CleanableItem]) -> [CleanableItem] {
@@ -194,6 +210,9 @@ struct CategoryDetailView: View {
 private struct FileRowView: View {
     @EnvironmentObject var appState: AppState
     let item: CleanableItem
+
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var isSelected: Bool {
         appState.isItemSelected(item)
@@ -234,10 +253,24 @@ private struct FileRowView: View {
                 Text(item.formattedSize)
                     .font(.callout)
                     .fontWeight(.medium)
+                    .monospacedDigit()
                     .frame(width: 80, alignment: .trailing)
             }
         }
-        .toggleStyle(.checkbox)
+        .toggleStyle(AnimatedCheckboxStyle(tint: item.category.color))
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(
+                    hovering
+                        ? Color.primary.opacity(0.06)
+                        : (isSelected ? item.category.color.opacity(0.04) : .clear)
+                )
+        )
+        .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.15), value: isSelected)
+        .onHover { hovering = $0 }
         .contextMenu {
             if !item.path.isEmpty {
                 Button("Reveal in Finder") {

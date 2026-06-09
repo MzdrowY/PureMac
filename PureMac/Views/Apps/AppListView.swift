@@ -4,6 +4,7 @@ struct AppListView: View {
     @EnvironmentObject var appState: AppState
     @State private var searchText = ""
     @State private var selection: InstalledApp.ID?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var sortOrder: [KeyPathComparator<InstalledApp>] = [
         .init(\.appName, order: .forward)
     ]
@@ -42,13 +43,17 @@ struct AppListView: View {
                     Label("Refresh", systemImage: "arrow.clockwise")
                 }
 
-                if !appState.selectedFiles.isEmpty {
-                    Button(uninstallLabel(count: appState.selectedFiles.count), role: .destructive) {
-                        appState.removeSelectedFiles()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.red)
+                // ToolbarItems can't run insertion transitions on macOS 13 —
+                // keep the button mounted and fade it with the selection.
+                Button(uninstallLabel(count: appState.selectedFiles.count), role: .destructive) {
+                    appState.removeSelectedFiles()
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+                .opacity(appState.selectedFiles.isEmpty ? 0 : 1)
+                .disabled(appState.selectedFiles.isEmpty)
+                .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.8),
+                           value: appState.selectedFiles.isEmpty)
             }
         }
     }
@@ -82,9 +87,7 @@ struct AppListView: View {
                 Table(filteredApps, selection: $selection, sortOrder: $sortOrder) {
                     TableColumn("Application", value: \.appName) { app in
                         HStack(spacing: 8) {
-                            Image(nsImage: app.icon)
-                                .resizable()
-                                .frame(width: 20, height: 20)
+                            HoverScaleIcon(icon: app.icon)
                             Text(app.appName)
                         }
                     }
@@ -134,8 +137,26 @@ struct AppListView: View {
             EmptyStateView(
                 "Select an App",
                 systemImage: "cursorarrow.click.2",
-                description: "Select an app from the list to see all its related files across your system."
+                description: "Select an app from the list to see all its related files across your system.",
+                tint: Tint.purple
             )
         }
+    }
+}
+
+/// App icon that scales up slightly on hover inside a Table cell.
+private struct HoverScaleIcon: View {
+    let icon: NSImage
+
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Image(nsImage: icon)
+            .resizable()
+            .frame(width: 20, height: 20)
+            .scaleEffect(hovering && !reduceMotion ? 1.12 : 1)
+            .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+            .onHover { hovering = $0 }
     }
 }

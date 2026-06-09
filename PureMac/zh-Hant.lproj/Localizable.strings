@@ -335,3 +335,15 @@
 "Storage composition" = "儲存空間組成";
 "total" = "總計";
 "Free" = "可用";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "應用程式";
+"Caches" = "快取";
+"Application Support" = "應用程式支援";
+"Preferences" = "偏好設定";
+"Logs" = "日誌";
+"Containers" = "容器";
+"Launch Agents" = "啟動代理";
+"Other Files" = "其他檔案";
+"Sound" = "聲音";
+"Play sound effects" = "播放音效";

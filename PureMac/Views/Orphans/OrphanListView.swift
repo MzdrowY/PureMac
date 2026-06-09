@@ -5,6 +5,7 @@ struct OrphanListView: View {
     @State private var selectedOrphans: Set<URL> = []
     @State private var isRemoving = false
     @State private var removalErrorMessage: String?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Group {
@@ -16,47 +17,32 @@ struct OrphanListView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if appState.orphanedFiles.isEmpty {
-                EmptyStateView("No Orphaned Files", systemImage: "checkmark.circle", description: "No leftover files from uninstalled apps were found.", action: { appState.findOrphans() }, actionLabel: "Scan for Orphans")
+                EmptyStateView("No Orphaned Files", systemImage: "checkmark.circle", description: "No leftover files from uninstalled apps were found.", action: { appState.findOrphans() }, actionLabel: "Scan for Orphans", tint: Tint.green)
             } else {
-                List(appState.orphanedFiles, id: \.self) { fileURL in
-                    Toggle(isOn: orphanBinding(for: fileURL)) {
-                        HStack {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: fileURL.path))
-                                .resizable()
-                                .frame(width: 16, height: 16)
-
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(fileURL.lastPathComponent)
-                                    .lineLimit(1)
-                                Text(fileURL.path)
-                                    .font(.caption)
-                                    .foregroundStyle(.tertiary)
-                                    .lineLimit(1)
-                                    .truncationMode(.middle)
-                            }
-
-                            Spacer()
-
-                            if let size = fileSize(fileURL) {
-                                Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
-                                    .monospacedDigit()
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                    .toggleStyle(.checkbox)
-                    .contextMenu {
-                        Button("Reveal in Finder") {
-                            revealInFinder(fileURL)
-                        }
-                        Button("Copy Path") {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(fileURL.path, forType: .string)
-                        }
-                        Divider()
-                        Button("Move to Trash", role: .destructive) {
-                            Task { await removeSingleOrphan(fileURL) }
-                        }
+                List {
+                    // No .staggered(): List is lazy, so a delayed-reveal would
+                    // blank each row as it scrolls in. The removal transition
+                    // below still gives the sweep-out on delete.
+                    ForEach(Array(appState.orphanedFiles.enumerated()), id: \.element) { _, fileURL in
+                        OrphanRowView(
+                            fileURL: fileURL,
+                            isSelected: orphanBinding(for: fileURL),
+                            fileSize: fileSize(fileURL),
+                            onReveal: { revealInFinder(fileURL) },
+                            onCopyPath: {
+                                NSPasteboard.general.clearContents()
+                                NSPasteboard.general.setString(fileURL.path, forType: .string)
+                            },
+                            onTrash: { Task { await removeSingleOrphan(fileURL) } }
+                        )
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .asymmetric(
+                                    insertion: .opacity,
+                                    removal: .move(edge: .leading).combined(with: .opacity)
+                                )
+                        )
                     }
                 }
             }
@@ -174,7 +160,15 @@ struct OrphanListView: View {
             }
         }
 
-        appState.orphanedFiles.removeAll { removedURLs.contains($0) }
+        // Sweep removed rows out (per-row transitions are attached in the
+        // List above); plain assignment under Reduce Motion.
+        if reduceMotion {
+            appState.orphanedFiles.removeAll { removedURLs.contains($0) }
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                appState.orphanedFiles.removeAll { removedURLs.contains($0) }
+            }
+        }
         selectedOrphans.subtract(removedURLs)
 
         if !failedPaths.isEmpty {
@@ -264,6 +258,65 @@ struct OrphanListView: View {
             return true
         } catch {
             return false
+        }
+    }
+}
+
+// MARK: - Row
+
+/// Orphan row extracted to its own struct so hover highlight and the springy
+/// checkbox are per-row state.
+private struct OrphanRowView: View {
+    let fileURL: URL
+    @Binding var isSelected: Bool
+    let fileSize: Int64?
+    let onReveal: () -> Void
+    let onCopyPath: () -> Void
+    let onTrash: () -> Void
+
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Toggle(isOn: $isSelected) {
+            HStack {
+                Image(nsImage: NSWorkspace.shared.icon(forFile: fileURL.path))
+                    .resizable()
+                    .frame(width: 16, height: 16)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(fileURL.lastPathComponent)
+                        .lineLimit(1)
+                    Text(fileURL.path)
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+
+                Spacer()
+
+                if let size = fileSize {
+                    Text(ByteCountFormatter.string(fromByteCount: size, countStyle: .file))
+                        .monospacedDigit()
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .toggleStyle(AnimatedCheckboxStyle(tint: Tint.pink))
+        .padding(.vertical, 2)
+        .padding(.horizontal, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(hovering ? Color.primary.opacity(0.06) : .clear)
+        )
+        .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+        .onHover { hovering = $0 }
+        .contextMenu {
+            Button("Reveal in Finder") { onReveal() }
+            Button("Copy Path") { onCopyPath() }
+            Divider()
+            Button("Move to Trash", role: .destructive) { onTrash() }
         }
     }
 }

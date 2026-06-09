@@ -6,6 +6,7 @@ struct MainWindow: View {
     @ObservedObject private var permission = PermissionCoordinator.shared
     @State private var selectedSection: AppSection? = .cleaning(.smartScan)
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
@@ -115,28 +116,10 @@ struct MainWindow: View {
 
     private func navRow(section: AppSection, label: LocalizedStringKey, icon: String,
                         tint: Color, badge: String?) -> some View {
-        let isSelected = selectedSection == section
-        return HStack(spacing: 10) {
-            IconTile(systemName: icon, tint: tint, size: 24, glow: isSelected)
-            Text(label)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
-            Spacer()
-            if let badge {
-                Text(badge)
-                    .font(.system(size: 11, weight: .semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(isSelected ? tint : .secondary)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(
-                            (isSelected ? tint : Color.primary).opacity(isSelected ? 0.15 : 0.06)
-                        )
-                    )
-            }
-        }
-        .padding(.vertical, 2)
-        .contentShape(Rectangle())
+        SidebarNavRow(
+            label: label, icon: icon, tint: tint, badge: badge,
+            isSelected: selectedSection == section
+        )
         .tag(section)
     }
 
@@ -199,11 +182,45 @@ struct MainWindow: View {
                 fdaToast
                     .padding(.horizontal, 16)
                     .padding(.top, 12)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .move(edge: .top).combined(with: .opacity)
+                    )
             }
             detailView
+                .id(selectedSection)
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .asymmetric(
+                            insertion: .opacity.combined(with: .offset(y: 10)),
+                            removal: .opacity
+                        )
+                )
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.22), value: selectedSection)
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
+                   value: appState.fdaBannerDismissed)
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
+                   value: appState.hasFullDiskAccess)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(
+            // Quiet ambient gradient under every section. Static layers,
+            // opacities kept low enough to stay clean in light mode.
+            ZStack {
+                Color(nsColor: .windowBackgroundColor)
+                LinearGradient(
+                    colors: [Tint.blue.opacity(0.05), .clear],
+                    startPoint: .topLeading, endPoint: .center
+                )
+                RadialGradient(
+                    colors: [Tint.purple.opacity(0.03), .clear],
+                    center: .topTrailing, startRadius: 0, endRadius: 600
+                )
+            }
+            .ignoresSafeArea()
+        )
     }
 
     @ViewBuilder
@@ -290,16 +307,65 @@ private func pulsingLockIconView() -> some View {
     }
 }
 
+/// Sidebar row with a springy hover highlight. Extracted to a struct so each
+/// row owns its hover state; the selected row's IconTile glows via the shared
+/// glow treatment in AppTheme.
+private struct SidebarNavRow: View {
+    let label: LocalizedStringKey
+    let icon: String
+    let tint: Color
+    let badge: String?
+    let isSelected: Bool
+
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        HStack(spacing: 10) {
+            IconTile(systemName: icon, tint: tint, size: 24, glow: isSelected)
+            Text(label)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+            Spacer()
+            if let badge {
+                Text(badge)
+                    .font(.system(size: 11, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(isSelected ? tint : .secondary)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule().fill(
+                            (isSelected ? tint : Color.primary).opacity(isSelected ? 0.15 : 0.06)
+                        )
+                    )
+                    .contentTransition(.numericText())
+            }
+        }
+        .padding(.vertical, 2)
+        // Leading anchor keeps the row from clipping against the sidebar edge.
+        .scaleEffect(hovering && !reduceMotion ? 1.02 : 1, anchor: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.primary.opacity(hovering && !isSelected ? 0.05 : 0))
+                .padding(.horizontal, -6)
+        )
+        .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+    }
+}
+
 /// Small reusable status dot with optional pulse. Used in the sidebar health
 /// footer and other "system status" surfaces.
 private struct PulsingDot: View {
     let tint: Color
     var isPulsing: Bool = false
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
-            if isPulsing {
+            if isPulsing && !reduceMotion {
                 Circle()
                     .stroke(tint.opacity(pulse ? 0.0 : 0.6), lineWidth: 2)
                     .frame(width: 18, height: 18)
@@ -315,11 +381,19 @@ private struct PulsingDot: View {
                 .shadow(color: tint.opacity(0.6), radius: 3)
         }
         .frame(width: 18, height: 18)
-        .onAppear {
-            guard isPulsing else { return }
-            withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
-                pulse = true
-            }
+        .onAppear { syncPulse() }
+        // The FDA status can flip while the window stays open — onAppear
+        // alone latches the first value and never starts/stops the loop.
+        .onChange(of: isPulsing) { _ in syncPulse() }
+    }
+
+    private func syncPulse() {
+        guard isPulsing, !reduceMotion else {
+            pulse = false
+            return
+        }
+        withAnimation(.easeOut(duration: 1.4).repeatForever(autoreverses: false)) {
+            pulse = true
         }
     }
 }

@@ -335,3 +335,15 @@
 "Storage composition" = "Composição do armazenamento";
 "total" = "total";
 "Free" = "Livre";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "Aplicativo";
+"Caches" = "Caches";
+"Application Support" = "Suporte de aplicativos";
+"Preferences" = "Preferências";
+"Logs" = "Registros";
+"Containers" = "Contêineres";
+"Launch Agents" = "Agentes de inicialização";
+"Other Files" = "Outros arquivos";
+"Sound" = "Som";
+"Play sound effects" = "Reproduzir efeitos sonoros";

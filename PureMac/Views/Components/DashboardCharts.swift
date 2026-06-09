@@ -120,6 +120,8 @@ struct StorageDonut: View {
     let segments: [Segment]
     var lineWidth: CGFloat = 16
     var gap: Double = 0.006    // angular gap between segments (fraction of circle)
+    /// When set (legend hover), every other segment dims for cross-highlight.
+    var highlightedID: String? = nil
 
     @State private var reveal: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -148,8 +150,10 @@ struct StorageDonut: View {
                     .trim(from: ranges[idx].start * reveal, to: ranges[idx].end * reveal)
                     .stroke(seg.color, style: StrokeStyle(lineWidth: lineWidth, lineCap: .butt))
                     .rotationEffect(.degrees(-90))
+                    .opacity(highlightedID == nil || highlightedID == seg.id ? 1 : 0.25)
             }
         }
+        .animation(reduceMotion ? nil : .easeOut(duration: 0.2), value: highlightedID)
         .onAppear {
             if reduceMotion { reveal = 1; return }
             withAnimation(.spring(response: 1.0, dampingFraction: 0.85)) { reveal = 1 }
@@ -174,6 +178,9 @@ struct CategoryBarChart: View {
 
     let bars: [Bar]
 
+    @State private var reveal: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         // Reserve ~28% trailing headroom so the byte-size annotation on the
         // longest bar renders fully instead of clipping at the chart edge
@@ -183,7 +190,7 @@ struct CategoryBarChart: View {
 
         return Chart(bars) { bar in
             BarMark(
-                x: .value("Size", bar.size),
+                x: .value("Size", Double(bar.size) * reveal),
                 y: .value("Category", bar.name)
             )
             .foregroundStyle(bar.category.color.gradient)
@@ -193,7 +200,12 @@ struct CategoryBarChart: View {
                     .font(.system(size: 10, weight: .semibold))
                     .monospacedDigit()
                     .foregroundStyle(.secondary)
+                    .opacity(reveal)
             }
+        }
+        .onAppear {
+            if reduceMotion { reveal = 1; return }
+            withAnimation(.spring(response: 0.8, dampingFraction: 0.85)) { reveal = 1 }
         }
         .chartXScale(domain: 0...upper)
         .chartXAxis(.hidden)
@@ -298,5 +310,137 @@ struct StaggeredReveal: ViewModifier {
 extension View {
     func staggered(_ index: Int, baseDelay: Double = 0.04) -> some View {
         modifier(StaggeredReveal(index: index, baseDelay: baseDelay))
+    }
+}
+
+// MARK: - Count-up bytes
+//
+// Animatable byte counter. `.contentTransition(.numericText())` only rolls
+// when the change happens inside an animation transaction — values assigned
+// during a plain data refresh snap instead. Driving the formatter through
+// `animatableData` makes the roll-up play every time the target changes.
+// Styling (font/color) flows in from the environment of the call site.
+
+struct CountUpBytes: View {
+    let bytes: Int64
+
+    @State private var shown: Double = 0
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Color.clear
+            .frame(width: 0, height: 0)
+            .modifier(ByteRollEffect(value: shown))
+            .onAppear { animate(to: bytes) }
+            .onChange(of: bytes) { animate(to: $0) }
+    }
+
+    private func animate(to target: Int64) {
+        if reduceMotion {
+            shown = Double(target)
+            return
+        }
+        withAnimation(.easeOut(duration: 0.8)) {
+            shown = Double(target)
+        }
+    }
+}
+
+private struct ByteRollEffect: AnimatableModifier {
+    var value: Double
+
+    var animatableData: Double {
+        get { value }
+        set { value = newValue }
+    }
+
+    func body(content: Content) -> some View {
+        Text(ByteCountFormatter.string(fromByteCount: Int64(max(0, value)), countStyle: .file))
+            .monospacedDigit()
+    }
+}
+
+// MARK: - Scanning gauge
+//
+// Active-scan focal element: a rotating trimmed arc over a radar wedge sweep
+// with two expanding halo rings. Reduce Motion freezes every loop and falls
+// back to the static arc + rolling percent.
+
+struct ScanningGauge: View {
+    let progress: Double
+    var tint: Color = Tint.blue
+    var label: LocalizedStringKey = "SCANNING"
+
+    @State private var rotate = false
+    @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        ZStack {
+            // Expanding halo rings, SuccessMedal-style but repeating.
+            if !reduceMotion {
+                ForEach(0..<2, id: \.self) { i in
+                    Circle()
+                        .stroke(tint.opacity(0.35), lineWidth: 1.5)
+                        .scaleEffect(pulse ? 1.22 : 0.9)
+                        .opacity(pulse ? 0 : 0.6)
+                        .animation(
+                            .easeOut(duration: 1.6)
+                                .repeatForever(autoreverses: false)
+                                .delay(Double(i) * 0.8),
+                            value: pulse
+                        )
+                }
+            }
+
+            // Radar wedge sweeping the ring interior. TimelineView keeps the
+            // angle deterministic; the branch above removes it entirely under
+            // Reduce Motion.
+            if !reduceMotion {
+                TimelineView(.animation) { timeline in
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                    let angle = (t.truncatingRemainder(dividingBy: 3.0) / 3.0) * 360.0
+                    Circle()
+                        .fill(
+                            AngularGradient(
+                                colors: [tint.opacity(0), tint.opacity(0), tint.opacity(0.22)],
+                                center: .center
+                            )
+                        )
+                        .rotationEffect(.degrees(angle))
+                }
+                .padding(14)
+                .clipShape(Circle())
+            }
+
+            Circle()
+                .stroke(Color.primary.opacity(0.07), lineWidth: 10)
+
+            Circle()
+                .trim(from: 0, to: CGFloat(max(0.05, min(0.95, progress))))
+                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
+                .rotationEffect(.degrees(rotate ? 360 : 0))
+                .animation(
+                    reduceMotion ? nil : .linear(duration: 4).repeatForever(autoreverses: false),
+                    value: rotate
+                )
+
+            VStack(spacing: 2) {
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 36, weight: .semibold))
+                    .monospacedDigit()
+                    .contentTransition(reduceMotion ? .identity : .numericText())
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.3), value: Int(progress * 100))
+                Text(label)
+                    .font(.system(size: 10, weight: .medium))
+                    .tracking(0.6)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .onAppear {
+            guard !reduceMotion else { return }
+            rotate = true
+            pulse = true
+        }
     }
 }

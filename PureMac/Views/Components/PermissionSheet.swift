@@ -8,6 +8,7 @@ struct PermissionSheet: View {
     @State private var appeared = false
     @State private var pulse = false
     @State private var showAdvanced = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -19,7 +20,13 @@ struct PermissionSheet: View {
         }
         .frame(width: 540)
         .background(Color(nsColor: .windowBackgroundColor))
+        .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.8),
+                   value: coordinator.hasFullDiskAccess)
         .onAppear {
+            if reduceMotion {
+                appeared = true
+                return
+            }
             withAnimation(.easeOut(duration: 0.4)) { appeared = true }
             withAnimation(.easeInOut(duration: 1.4).repeatForever(autoreverses: true)) {
                 pulse = true
@@ -76,8 +83,14 @@ struct PermissionSheet: View {
     private var body_: some View {
         if coordinator.hasFullDiskAccess {
             grantedBody
+                .transition(
+                    reduceMotion
+                        ? .opacity
+                        : .scale(scale: 0.9).combined(with: .opacity)
+                )
         } else {
             requestBody
+                .transition(.opacity)
         }
     }
 
@@ -299,15 +312,9 @@ struct PermissionSheet: View {
 
     private var grantedBody: some View {
         VStack(spacing: 10) {
-            ZStack {
-                Circle()
-                    .fill(Tint.green.opacity(0.15))
-                    .frame(width: 72, height: 72)
-                    .scaleEffect(pulse ? 1.05 : 0.95)
-                Image(systemName: "checkmark.seal.fill")
-                    .font(.system(size: 36, weight: .bold))
-                    .foregroundStyle(Tint.green)
-            }
+            // SuccessMedal pops + ripples once on its own and already
+            // honors Reduce Motion — no shared `pulse` state reuse.
+            SuccessMedal(size: 72)
             Text("Access granted")
                 .font(.system(size: 15, weight: .bold))
             Text("Retrying the operation now.")

@@ -335,3 +335,15 @@
 "Storage composition" = "ストレージの内訳";
 "total" = "合計";
 "Free" = "空き";
+
+/* UI polish (v2.8.0): leftover groups + sound toggle */
+"Application" = "アプリケーション";
+"Caches" = "キャッシュ";
+"Application Support" = "アプリケーションサポート";
+"Preferences" = "環境設定";
+"Logs" = "ログ";
+"Containers" = "コンテナ";
+"Launch Agents" = "起動エージェント";
+"Other Files" = "その他のファイル";
+"Sound" = "サウンド";
+"Play sound effects" = "効果音を再生";

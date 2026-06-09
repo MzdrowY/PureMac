@@ -9,14 +9,45 @@ struct DashboardView: View {
     @State private var showConfirmation = false
     @State private var fireCleanConfetti = false
     @State private var lastCleanedScanState: Bool = false
+    @State private var hoveredSegment: String?
+    /// Confetti burst origin as a fraction of the dashboard, derived from the
+    /// SuccessMedal's real frame so the burst tracks it across window sizes
+    /// and RTL layout instead of a hand-aimed constant.
+    @State private var burstOrigin: UnitPoint = UnitPoint(x: 0.25, y: 0.28)
+    @State private var dashboardSize: CGSize = .zero
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private let dashboardSpace = "dashboard"
+
+    /// Hero cards rise in with a slight settle and dissolve out; under
+    /// Reduce Motion both directions collapse to a plain cross-fade.
+    private var heroTransition: AnyTransition {
+        reduceMotion
+            ? .opacity
+            : .asymmetric(
+                insertion: .opacity
+                    .combined(with: .offset(y: 12))
+                    .combined(with: .scale(scale: 0.98, anchor: .top)),
+                removal: .opacity
+            )
+    }
 
     var body: some View {
         ZStack {
+            // Quiet tinted wash so the glass hero states have color to
+            // refract. Static — no Reduce Motion concerns.
+            LinearGradient(
+                colors: [Tint.blue.opacity(0.08), Tint.purple.opacity(0.05), .clear],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     switch appState.scanState {
                     case .idle:
                         hero
+                            .transition(heroTransition)
                         stats
                         if appState.diskInfo.totalSpace > 0 {
                             sectionHeader("Storage composition")
@@ -28,12 +59,14 @@ struct DashboardView: View {
                         }
                     case .scanning:
                         scanningHero
+                            .transition(heroTransition)
                         if !appState.allResults.isEmpty {
                             sectionHeader("Found so far")
                             liveResults
                         }
                     case .completed:
                         completedHero
+                            .transition(heroTransition)
                         if appState.totalJunkSize > 0 {
                             sectionHeader("By category")
                             categoryChartCard
@@ -41,22 +74,33 @@ struct DashboardView: View {
                         }
                     case .cleaning:
                         cleaningHero
+                            .transition(heroTransition)
                     case .cleaned:
                         cleanedHero
+                            .transition(heroTransition)
                     }
                 }
                 .padding(.horizontal, 28)
                 .padding(.vertical, 24)
                 .frame(maxWidth: 920, alignment: .leading)
+                .animation(reduceMotion ? nil : MotionTokens.gentle, value: appState.scanState)
             }
 
             // Celebratory burst when a clean cycle finishes with something
-            // freed. Pinned to the whole dashboard so particles cover the
-            // hero card. allowsHitTesting=false keeps Done clickable through
-            // falling confetti.
-            ConfettiView(trigger: fireCleanConfetti)
+            // freed. Origin tracks the SuccessMedal's real frame (see
+            // burstOrigin) so it explodes from the celebration on any window
+            // size / layout direction.
+            // allowsHitTesting=false keeps Done clickable through particles.
+            ConfettiView(trigger: fireCleanConfetti, mode: .burst(origin: burstOrigin))
                 .allowsHitTesting(false)
         }
+        .coordinateSpace(name: dashboardSpace)
+        .background(
+            GeometryReader { geo in
+                Color.clear.onAppear { dashboardSize = geo.size }
+                    .onChange(of: geo.size) { dashboardSize = $0 }
+            }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: appState.scanState) { newState in
             // Fire only on the rising edge of .cleaned with freed > 0 so
@@ -67,7 +111,17 @@ struct DashboardView: View {
                 return false
             }()
             if isCleaned && !lastCleanedScanState && appState.totalFreedSpace > 0 {
-                fireCleanConfetti.toggle()
+                if reduceMotion {
+                    // Confetti renders nothing under Reduce Motion; no need
+                    // to wait for an entrance spring that isn't playing.
+                    fireCleanConfetti.toggle()
+                } else {
+                    // Let the hero settle and the counter roll before the
+                    // burst so the celebration lands as one beat.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                        fireCleanConfetti.toggle()
+                    }
+                }
             }
             lastCleanedScanState = isCleaned
         }
@@ -101,8 +155,13 @@ struct DashboardView: View {
 
         return CardSurface(padding: 24, accent: stress ? Tint.orange : Tint.blue, elevation: .raised) {
             HStack(alignment: .center, spacing: 28) {
-                HealthRing(percent: percentUsed)
-                    .frame(width: 180, height: 180)
+                ZStack {
+                    // Slow atmospheric drift behind the ring — barely-there
+                    // ambient depth, frozen under Reduce Motion.
+                    HeroDrift(tint: stress ? Tint.orange : Tint.blue)
+                    HealthRing(percent: percentUsed)
+                        .frame(width: 180, height: 180)
+                }
 
                 VStack(alignment: .leading, spacing: 14) {
                     HStack(alignment: .top) {
@@ -119,10 +178,8 @@ struct DashboardView: View {
                                                tint: Tint.orange)
                                 }
                             }
-                            Text(ByteCountFormatter.string(fromByteCount: free, countStyle: .file))
+                            CountUpBytes(bytes: free)
                                 .font(.system(size: 34, weight: .semibold))
-                                .monospacedDigit()
-                                .contentTransition(.numericText())
                                 .foregroundStyle(stress ? Tint.orange : Color.primary)
                             Text(freeOfText(total: total))
                                 .font(.system(size: 12))
@@ -133,11 +190,9 @@ struct DashboardView: View {
                             appState.startSmartScan()
                         } label: {
                             Label("Smart Scan", systemImage: "sparkles")
-                                .font(.system(size: 13, weight: .semibold))
                                 .padding(.horizontal, 4)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(GlowProminentButtonStyle(breathes: true))
                     }
 
                     storageBreakdown(used: used, total: total)
@@ -215,7 +270,8 @@ struct DashboardView: View {
                 tint: Tint.blue,
                 label: "Free Space",
                 value: ByteCountFormatter.string(fromByteCount: free, countStyle: .file),
-                delta: total > 0 ? freeSpaceDelta(total: total, percentUsed: percentUsed) : nil
+                delta: total > 0 ? freeSpaceDelta(total: total, percentUsed: percentUsed) : nil,
+                byteValue: free
             )
             .staggered(0)
             StatCard(
@@ -227,7 +283,8 @@ struct DashboardView: View {
                     : "—",
                 delta: appState.allResults.isEmpty
                     ? String(localized: "Run a scan")
-                    : junkFoundDelta(count: appState.allResults.count)
+                    : junkFoundDelta(count: appState.allResults.count),
+                byteValue: appState.totalJunkSize > 0 ? appState.totalJunkSize : nil
             )
             .staggered(1)
             StatCard(
@@ -245,7 +302,8 @@ struct DashboardView: View {
                 value: appState.diskInfo.purgeableSpace > 0
                     ? ByteCountFormatter.string(fromByteCount: appState.diskInfo.purgeableSpace, countStyle: .file)
                     : "—",
-                delta: String(localized: "APFS reclaimable")
+                delta: String(localized: "APFS reclaimable"),
+                byteValue: appState.diskInfo.purgeableSpace > 0 ? appState.diskInfo.purgeableSpace : nil
             )
             .staggered(3)
         }
@@ -293,7 +351,7 @@ struct DashboardView: View {
         return CardSurface(padding: 18, elevation: .standard) {
             HStack(alignment: .center, spacing: 24) {
                 ZStack {
-                    StorageDonut(segments: segments)
+                    StorageDonut(segments: segments, highlightedID: hoveredSegment)
                         .frame(width: 132, height: 132)
                     VStack(spacing: 1) {
                         Text(ByteCountFormatter.string(fromByteCount: total, countStyle: .file))
@@ -307,8 +365,12 @@ struct DashboardView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(Array(segments.enumerated()), id: \.element.id) { idx, seg in
-                        LegendChip(color: seg.color, label: seg.label, value: seg.display)
-                            .staggered(idx)
+                        HoverableLegendChip(
+                            color: seg.color, label: seg.label, value: seg.display
+                        ) { hovering in
+                            hoveredSegment = hovering ? seg.id : nil
+                        }
+                        .staggered(idx)
                     }
                 }
                 Spacer(minLength: 0)
@@ -359,7 +421,7 @@ struct DashboardView: View {
     // MARK: - Scanning state
 
     private var scanningHero: some View {
-        CardSurface(padding: 24, accent: Tint.blue, elevation: .raised) {
+        CardSurface(padding: 24, accent: Tint.blue, elevation: .raised, material: .ultraThinMaterial) {
             HStack(alignment: .center, spacing: 28) {
                 ScanningGauge(progress: appState.scanProgress)
                     .frame(width: 180, height: 180)
@@ -369,18 +431,46 @@ struct DashboardView: View {
                         Text("Scanning your Mac")
                             .font(.system(size: 22, weight: .bold))
                     }
+
+                    // Category line slides up as the scan advances.
                     Text(currentlyInText)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
-                    ProgressView(value: appState.scanProgress)
-                        .progressViewStyle(.linear)
-                        .tint(Tint.blue)
+                        .id(appState.currentScanCategory)
+                        .transition(
+                            reduceMotion
+                                ? .opacity
+                                : .asymmetric(
+                                    insertion: .move(edge: .bottom).combined(with: .opacity),
+                                    removal: .move(edge: .top).combined(with: .opacity)
+                                )
+                        )
+
+                    ShimmerProgressBar(progress: appState.scanProgress)
                         .frame(maxWidth: 320)
                         .padding(.top, 2)
+
+                    // Live file-path ticker — the "it's really working"
+                    // signal. Fixed height so rapid path swaps don't bounce
+                    // the layout.
+                    Text(tickerPath)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .frame(maxWidth: 360, alignment: .leading)
+                        .frame(height: 14)
+                        .opacity(tickerPath.isEmpty ? 0 : 1)
                 }
+                .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: appState.currentScanCategory)
                 Spacer(minLength: 0)
             }
         }
+    }
+
+    private var tickerPath: String {
+        guard !appState.currentScanPath.isEmpty else { return "" }
+        return (appState.currentScanPath as NSString).abbreviatingWithTildeInPath
     }
 
     private var currentlyInText: String {
@@ -406,11 +496,18 @@ struct DashboardView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .transition(
+                        reduceMotion
+                            ? .opacity
+                            : .move(edge: .bottom).combined(with: .opacity)
+                    )
                     if result.id != appState.allResults.prefix(8).last?.id {
                         Divider().padding(.leading, 54)
                     }
                 }
             }
+            .animation(reduceMotion ? nil : .spring(response: 0.4, dampingFraction: 0.85),
+                       value: appState.allResults.count)
         }
     }
 
@@ -422,10 +519,8 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(alignment: .firstTextBaseline) {
                     if !isClean {
-                        Text(ByteCountFormatter.string(fromByteCount: appState.totalJunkSize, countStyle: .file))
+                        CountUpBytes(bytes: appState.totalJunkSize)
                             .font(.system(size: 40, weight: .semibold))
-                            .monospacedDigit()
-                            .contentTransition(.numericText())
                         Text("found")
                             .font(.system(size: 16))
                             .foregroundStyle(.secondary)
@@ -452,11 +547,9 @@ struct DashboardView: View {
                                 } icon: {
                                     Image(systemName: "sparkles")
                                 }
-                                .font(.system(size: 13, weight: .semibold))
                                 .padding(.horizontal, 6)
                             }
-                            .buttonStyle(.borderedProminent)
-                            .controlSize(.large)
+                            .buttonStyle(GlowProminentButtonStyle())
                         }
                         Spacer()
                     }
@@ -526,7 +619,7 @@ struct DashboardView: View {
     }
 
     private var cleaningHero: some View {
-        CardSurface(padding: 24, accent: Tint.orange, elevation: .raised) {
+        CardSurface(padding: 24, accent: Tint.orange, elevation: .raised, material: .ultraThinMaterial) {
             HStack(alignment: .center, spacing: 28) {
                 ScanningGauge(progress: appState.cleanProgress, tint: Tint.orange, label: "CLEANING")
                     .frame(width: 180, height: 180)
@@ -536,6 +629,9 @@ struct DashboardView: View {
                     Text(percentCompleteText)
                         .font(.system(size: 13))
                         .foregroundStyle(.secondary)
+                    ShimmerProgressBar(progress: appState.cleanProgress, tint: Tint.orange)
+                        .frame(maxWidth: 320)
+                        .padding(.top, 2)
                 }
                 Spacer(minLength: 0)
             }
@@ -546,23 +642,36 @@ struct DashboardView: View {
         String(format: String(localized: "%lld%% complete"), Int64(appState.cleanProgress * 100))
     }
 
+    /// Convert the medal's frame (in dashboard coordinates) into a UnitPoint
+    /// for the confetti emitter. Falls back to the existing value until the
+    /// dashboard size is known.
+    private func updateBurstOrigin(medalFrame: CGRect) {
+        guard dashboardSize.width > 0, dashboardSize.height > 0 else { return }
+        burstOrigin = UnitPoint(
+            x: max(0, min(1, medalFrame.midX / dashboardSize.width)),
+            y: max(0, min(1, medalFrame.midY / dashboardSize.height))
+        )
+    }
+
     private var cleanedHero: some View {
-        CardSurface(padding: 24, accent: Tint.green, elevation: .raised) {
+        CardSurface(padding: 24, accent: Tint.green, elevation: .raised, material: .ultraThinMaterial) {
             HStack(alignment: .center, spacing: 28) {
                 SuccessMedal()
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.onAppear { updateBurstOrigin(medalFrame: geo.frame(in: .named(dashboardSpace))) }
+                        }
+                    )
 
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(ByteCountFormatter.string(fromByteCount: appState.totalFreedSpace, countStyle: .file))
+                    CountUpBytes(bytes: appState.totalFreedSpace)
                         .font(.system(size: 40, weight: .semibold))
-                        .monospacedDigit()
-                        .contentTransition(.numericText())
                         .foregroundStyle(Tint.green)
                     Text("freed")
                         .font(.system(size: 14))
                         .foregroundStyle(.secondary)
                     Button("Done") { appState.scanState = .idle }
-                        .buttonStyle(.borderedProminent)
-                        .controlSize(.large)
+                        .buttonStyle(GlowProminentButtonStyle(tint: Tint.green, gradient: TintGradient.of(Tint.green)))
                         .padding(.top, 4)
                 }
                 Spacer(minLength: 0)
@@ -587,6 +696,9 @@ private struct StatCard: View {
     let label: LocalizedStringKey
     let value: String
     let delta: String?
+    /// When set, the headline renders as a rolling byte counter instead of
+    /// the static `value` string.
+    var byteValue: Int64? = nil
 
     var body: some View {
         CardSurface(padding: 14, accent: tint) {
@@ -599,12 +711,18 @@ private struct StatCard: View {
                         .textCase(.uppercase)
                         .tracking(0.4)
                 }
-                Text(value)
-                    .font(.system(size: 22, weight: .bold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.6)
+                Group {
+                    if let byteValue {
+                        CountUpBytes(bytes: byteValue)
+                    } else {
+                        Text(value)
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                    }
+                }
+                .font(.system(size: 22, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
                 if let delta {
                     Text(delta)
                         .font(.system(size: 11))
@@ -612,7 +730,7 @@ private struct StatCard: View {
                 }
             }
         }
-        .pressable(hoverScale: 1.018)
+        .pressable(hoverScale: 1.02, lift: true)
     }
 }
 
@@ -648,7 +766,7 @@ private struct SuggestionRow: View {
                     .foregroundStyle(.tertiary)
             }
         }
-        .pressable(hoverScale: 1.01)
+        .pressable(hoverScale: 1.01, lift: true)
     }
 }
 
@@ -674,35 +792,103 @@ private struct LegendDot: View {
     }
 }
 
-private struct ScanningGauge: View {
-    let progress: Double
-    var tint: Color = Tint.blue
-    var label: LocalizedStringKey = "SCANNING"
-    @State private var rotate = false
+// ScanningGauge now lives in Components/DashboardCharts.swift (radar sweep +
+// halo rings + Reduce Motion compliance).
+
+/// Legend chip wrapper that reports hover for donut cross-highlighting and
+/// scales slightly while hovered.
+private struct HoverableLegendChip: View {
+    let color: Color
+    let label: LocalizedStringKey
+    let value: String
+    let onHoverChange: (Bool) -> Void
+
+    @State private var hovering = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ZStack {
-            Circle()
-                .stroke(Color.primary.opacity(0.07), lineWidth: 10)
+        LegendChip(color: color, label: label, value: value)
+            .scaleEffect(hovering && !reduceMotion ? 1.05 : 1, anchor: .leading)
+            .animation(reduceMotion ? nil : MotionTokens.snappy, value: hovering)
+            .onHover { h in
+                hovering = h
+                onHoverChange(h)
+            }
+    }
+}
 
-            Circle()
-                .trim(from: 0, to: CGFloat(max(0.05, min(0.95, progress))))
-                .stroke(tint, style: StrokeStyle(lineWidth: 10, lineCap: .round))
-                .rotationEffect(.degrees(rotate ? 360 : 0))
-                .animation(.linear(duration: 4).repeatForever(autoreverses: false), value: rotate)
+/// Barely-there radial wash that drifts behind the idle hero ring. Static at
+/// rest size under Reduce Motion.
+private struct HeroDrift: View {
+    let tint: Color
 
-            VStack(spacing: 2) {
-                Text("\(Int(progress * 100))%")
-                    .font(.system(size: 36, weight: .semibold))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text(label)
-                    .font(.system(size: 10, weight: .medium))
-                    .tracking(0.6)
-                    .foregroundStyle(.secondary)
+    @State private var drift = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        RadialGradient(
+            colors: [tint.opacity(0.16), .clear],
+            center: .center, startRadius: 10, endRadius: 130
+        )
+        .blur(radius: 24)
+        .scaleEffect(drift ? 1.12 : 0.96)
+        .offset(x: drift ? 8 : -8)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 3.0).repeatForever(autoreverses: true)) {
+                drift = true
             }
         }
-        .onAppear { rotate = true }
+    }
+}
+
+/// Gradient progress capsule with a traveling shimmer band, replacing the
+/// stock linear ProgressView during scans/cleans. Shimmer is masked to the
+/// filled portion and removed entirely under Reduce Motion.
+private struct ShimmerProgressBar: View {
+    let progress: Double
+    var tint: Color = Tint.blue
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var clamped: Double { max(0, min(1, progress)) }
+
+    var body: some View {
+        GeometryReader { geo in
+            let fillWidth = geo.size.width * CGFloat(clamped)
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.primary.opacity(0.08))
+
+                Capsule()
+                    .fill(
+                        LinearGradient(colors: [tint, tint.opacity(0.7)],
+                                       startPoint: .leading, endPoint: .trailing)
+                    )
+                    .frame(width: max(8, fillWidth))
+                    .animation(reduceMotion ? nil : .easeOut(duration: 0.35), value: clamped)
+
+                if !reduceMotion {
+                    TimelineView(.animation) { timeline in
+                        let t = timeline.date.timeIntervalSinceReferenceDate
+                        let cycle = (t.truncatingRemainder(dividingBy: 1.8)) / 1.8
+                        let bandWidth: CGFloat = 56
+                        LinearGradient(
+                            colors: [.clear, .white.opacity(0.35), .clear],
+                            startPoint: .leading, endPoint: .trailing
+                        )
+                        .frame(width: bandWidth)
+                        .offset(x: CGFloat(cycle) * (geo.size.width + bandWidth) - bandWidth)
+                    }
+                    .mask(
+                        Capsule()
+                            .frame(width: max(8, fillWidth))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    )
+                }
+            }
+        }
+        .frame(height: 9)
     }
 }
 

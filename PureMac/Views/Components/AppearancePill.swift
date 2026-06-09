@@ -6,12 +6,13 @@ import SwiftUI
 struct AppearancePill: View {
     @Binding var selection: AppearanceMode
     @Namespace private var indicator
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 2) {
             ForEach(AppearanceMode.allCases) { mode in
                 Button {
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.78)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.32, dampingFraction: 0.78)) {
                         selection = mode
                     }
                 } label: {

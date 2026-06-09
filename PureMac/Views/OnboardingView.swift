@@ -8,10 +8,13 @@ import SwiftUI
 struct OnboardingView: View {
     @Binding var isComplete: Bool
     @State private var page: Page = .welcome
-    @State private var appeared = false
     @State private var hasFda = false
     @State private var hasOpenedSettings = false
     @State private var autoAdvanceScheduled = false
+    /// +1 when navigating forward, -1 going back — drives the slide direction
+    /// so Back doesn't slide the wrong way.
+    @State private var direction: Int = 1
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let pollTimer = Timer.publish(every: 1.0, on: .main, in: .common).autoconnect()
 
@@ -20,6 +23,17 @@ struct OnboardingView: View {
 
         var index: Int { rawValue }
         static var count: Int { allCases.count }
+    }
+
+    private var pageTransition: AnyTransition {
+        guard !reduceMotion else { return .opacity }
+        return .asymmetric(
+            insertion: .offset(x: direction >= 0 ? 48 : -48)
+                .combined(with: .opacity)
+                .combined(with: .scale(scale: 0.98)),
+            removal: .offset(x: direction >= 0 ? -48 : 48)
+                .combined(with: .opacity)
+        )
     }
 
     var body: some View {
@@ -34,12 +48,7 @@ struct OnboardingView: View {
                     .padding(.top, 44)
                     .padding(.bottom, 12)
                     .id(page)
-                    .transition(
-                        .asymmetric(
-                            insertion: .opacity.combined(with: .move(edge: .trailing)),
-                            removal: .opacity.combined(with: .move(edge: .leading))
-                        )
-                    )
+                    .transition(pageTransition)
 
                 bottomBar
             }
@@ -47,7 +56,6 @@ struct OnboardingView: View {
         .frame(width: 680, height: 560)
         .onAppear {
             FullDiskAccessManager.shared.triggerRegistration()
-            withAnimation(.easeOut(duration: 0.5)) { appeared = true }
             refreshFda()
         }
         .onReceive(pollTimer) { _ in
@@ -58,7 +66,7 @@ struct OnboardingView: View {
     @ViewBuilder
     private var content: some View {
         switch page {
-        case .welcome: WelcomeScene(appeared: appeared)
+        case .welcome: WelcomeScene()
         case .mission: MissionScene()
         case .permission: PermissionScene(
             hasFda: hasFda,
@@ -75,15 +83,17 @@ struct OnboardingView: View {
     private var backdrop: some View {
         ZStack {
             Color(nsColor: .windowBackgroundColor)
-            // Radial wash that shifts hue per page. Subtle enough to read
-            // as ambient warmth rather than decoration.
+            // Radial wash that shifts hue per page and drifts opposite the
+            // page slide — a slow parallax layer behind the faster foreground
+            // spring. Static under Reduce Motion.
             RadialGradient(
                 colors: [pageTint.opacity(0.18), .clear],
                 center: .topTrailing,
                 startRadius: 60,
                 endRadius: 520
             )
-            .animation(.easeInOut(duration: 0.6), value: page)
+            .offset(x: reduceMotion ? 0 : CGFloat(page.index) * -30)
+            .animation(reduceMotion ? nil : .easeInOut(duration: 0.8), value: page)
         }
     }
 
@@ -125,8 +135,7 @@ struct OnboardingView: View {
 
             if page == .ready {
                 Button("Start") { isComplete = true }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .buttonStyle(GlowProminentButtonStyle(breathes: true))
             } else {
                 Button(page == .permission ? "Continue" : "Next") { advance(by: 1) }
                     .buttonStyle(.borderedProminent)
@@ -149,7 +158,10 @@ struct OnboardingView: View {
         let target = max(0, min(Page.count - 1, page.index + delta))
         guard target != page.index else { return }
         Haptics.tap()
-        withAnimation(.spring(response: 0.45, dampingFraction: 0.85)) {
+        // Direction must be set BEFORE the transaction so the transition
+        // resolves with the correct slide edge.
+        direction = delta >= 0 ? 1 : -1
+        withAnimation(reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.85)) {
             page = Page(rawValue: target) ?? page
         }
     }
@@ -194,8 +206,8 @@ struct OnboardingView: View {
 // MARK: - Scenes
 
 private struct WelcomeScene: View {
-    let appeared: Bool
     @State private var bob = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 26) {
@@ -208,8 +220,9 @@ private struct WelcomeScene: View {
                         .interpolation(.high)
                         .frame(width: 120, height: 120)
                         .shadow(color: .black.opacity(0.15), radius: 18, y: 8)
-                        .offset(y: bob ? -4 : 4)
+                        .offset(y: reduceMotion ? 0 : (bob ? -4 : 4))
                         .onAppear {
+                            guard !reduceMotion else { return }
                             withAnimation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true)) {
                                 bob = true
                             }
@@ -220,6 +233,7 @@ private struct WelcomeScene: View {
                         .foregroundStyle(Tint.blue)
                 }
             }
+            .staggered(0, baseDelay: 0.07)
 
             VStack(spacing: 12) {
                 Text("Reclaim your Mac")
@@ -231,14 +245,14 @@ private struct WelcomeScene: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 420)
             }
-            .opacity(appeared ? 1 : 0)
-            .offset(y: appeared ? 0 : 8)
+            .staggered(1, baseDelay: 0.07)
 
             Text("Free. Open source. MIT licensed.")
                 .font(.system(size: 11.5, weight: .medium))
                 .foregroundStyle(.tertiary)
                 .tracking(0.3)
                 .padding(.top, 4)
+                .staggered(2, baseDelay: 0.07)
 
             Spacer(minLength: 0)
         }
@@ -258,6 +272,7 @@ private struct MissionScene: View {
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
             }
+            .staggered(0, baseDelay: 0.07)
 
             VStack(spacing: 12) {
                 FeatureRow(
@@ -266,18 +281,21 @@ private struct MissionScene: View {
                     title: "Smart Scan",
                     body: "Find caches, logs, broken installs, and the AI-app history hiding in your library."
                 )
+                .staggered(1, baseDelay: 0.07)
                 FeatureRow(
                     systemImage: "square.grid.2x2.fill",
                     tint: Tint.purple,
                     title: "App Uninstaller",
                     body: "Drag an app, see every file it dropped, remove all of it. No leftovers."
                 )
+                .staggered(2, baseDelay: 0.07)
                 FeatureRow(
                     systemImage: "doc.questionmark.fill",
                     tint: Tint.pink,
                     title: "Orphan Finder",
                     body: "Surfaces files that outlived the apps that created them."
                 )
+                .staggered(3, baseDelay: 0.07)
             }
             .frame(maxWidth: 460)
 
@@ -340,9 +358,11 @@ private struct PermissionScene: View {
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 460)
             }
+            .staggered(0, baseDelay: 0.07)
 
             FDADemoView()
                 .frame(maxWidth: 420)
+                .staggered(1, baseDelay: 0.07)
 
             if hasFda {
                 Label("All set — moving you to the next step.", systemImage: "checkmark.circle.fill")

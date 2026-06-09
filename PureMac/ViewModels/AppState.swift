@@ -46,6 +46,9 @@ final class AppState: ObservableObject {
     @Published var scanProgress: Double = 0
     @Published var cleanProgress: Double = 0
     @Published var currentScanCategory: String = ""
+    /// Last filesystem path the scan engine touched — feeds the dashboard's
+    /// live ticker. Throttled at the engine side (~10Hz).
+    @Published var currentScanPath: String = ""
     @Published var showCleanConfirmation = false
     @Published var lastCleanedDate: Date?
     @Published var selectedCleanupItems: Set<UUID> = []
@@ -351,7 +354,16 @@ final class AppState: ObservableObject {
 
     private func applyRemovedAppFiles(_ urls: [URL]) {
         guard !urls.isEmpty else { return }
-        discoveredFiles.removeAll { urls.contains($0) }
+        // Animate the row sweep-out (AppFilesView attaches the per-row
+        // transitions). NSWorkspace is the Reduce Motion check available
+        // outside a View's Environment.
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            discoveredFiles.removeAll { urls.contains($0) }
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                discoveredFiles.removeAll { urls.contains($0) }
+            }
+        }
         selectedFiles.subtract(urls)
         Logger.shared.log("Removed \(urls.count) file\(urls.count == 1 ? "" : "s")", level: .info)
     }
@@ -751,12 +763,17 @@ final class AppState: ObservableObject {
                 currentScanCategory = category.rawValue
                 scanState = .scanning(progress: progress, currentCategory: category.rawValue)
 
-                let result = await scanEngine.scanCategory(category)
+                let result = await scanEngine.scanCategory(category) { [weak self] path in
+                    Task { @MainActor [weak self] in
+                        self?.currentScanPath = path
+                    }
+                }
                 categoryResults[category] = result
                 totalJunkSize += result.totalSize
             }
 
             scanProgress = 1.0
+            currentScanPath = ""
             scanState = .completed
             loadDiskInfo()
         }
@@ -771,11 +788,16 @@ final class AppState: ObservableObject {
         Task {
             scanProgress = 0.5
             clearSelectionState(for: category)
-            let result = await scanEngine.scanCategory(category)
+            let result = await scanEngine.scanCategory(category) { [weak self] path in
+                Task { @MainActor [weak self] in
+                    self?.currentScanPath = path
+                }
+            }
             categoryResults[category] = result
 
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
             scanProgress = 1.0
+            currentScanPath = ""
             scanState = .completed
         }
     }
@@ -811,7 +833,7 @@ final class AppState: ObservableObject {
 
             totalFreedSpace = result.freedSpace
             lastCleanedDate = Date()
-            if result.itemsCleaned > 0 { Haptics.success() }
+            if result.itemsCleaned > 0 { Haptics.successWithSound() }
 
             let survivors = itemsToClean.filter { !result.cleanedPaths.contains($0.path) }
 

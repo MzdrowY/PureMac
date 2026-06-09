@@ -40,8 +40,10 @@ struct GeneralSettingsView: View {
     @AppStorage("settings.general.launchAtLogin") private var launchAtLogin = false
     @AppStorage("settings.general.searchSensitivity") private var sensitivity: SearchSensitivity = .enhanced
     @AppStorage("settings.general.confirmBeforeDelete") private var confirmBeforeDelete = true
+    @AppStorage(Haptics.soundEffectsKey) private var soundEffects = true
     @AppStorage(AppLanguage.preferenceKey) private var appLanguageRaw = AppLanguage.current.rawValue
     @State private var languageNeedsRelaunch = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
@@ -75,11 +77,17 @@ struct GeneralSettingsView: View {
                     Text("Restart PureMac to apply the selected language.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
 
                     Button("Relaunch Now") {
                         relaunchApp()
                     }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
+            }
+
+            Section("Sound") {
+                Toggle("Play sound effects", isOn: $soundEffects)
             }
 
             Section("Safety") {
@@ -87,6 +95,8 @@ struct GeneralSettingsView: View {
             }
         }
         .formStyle(.grouped)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85),
+                   value: languageNeedsRelaunch)
     }
 
     private var launchAtLoginBinding: Binding<Bool> {
@@ -181,6 +191,7 @@ struct CleaningSettingsView: View {
 
 struct ScheduleSettingsView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Form {
@@ -188,26 +199,31 @@ struct ScheduleSettingsView: View {
                 Toggle("Enable scheduled scanning", isOn: $appState.scheduler.config.isEnabled)
 
                 if appState.scheduler.config.isEnabled {
-                    Picker("Scan interval", selection: $appState.scheduler.config.interval) {
-                        ForEach(ScheduleInterval.allCases) { interval in
-                            Text(LocalizedStringKey(interval.rawValue)).tag(interval)
+                    Group {
+                        Picker("Scan interval", selection: $appState.scheduler.config.interval) {
+                            ForEach(ScheduleInterval.allCases) { interval in
+                                Text(LocalizedStringKey(interval.rawValue)).tag(interval)
+                            }
+                        }
+
+                        Toggle("Auto-clean after scan", isOn: $appState.scheduler.config.autoClean)
+                        Toggle("Auto-purge purgeable space", isOn: $appState.scheduler.config.autoPurge)
+                        Toggle("Notify on completion", isOn: $appState.scheduler.config.notifyOnCompletion)
+
+                        HStack {
+                            Text("Last run")
+                            Spacer()
+                            Text(appState.scheduler.config.formattedLastRun)
+                                .foregroundStyle(.secondary)
                         }
                     }
-
-                    Toggle("Auto-clean after scan", isOn: $appState.scheduler.config.autoClean)
-                    Toggle("Auto-purge purgeable space", isOn: $appState.scheduler.config.autoPurge)
-                    Toggle("Notify on completion", isOn: $appState.scheduler.config.notifyOnCompletion)
-
-                    HStack {
-                        Text("Last run")
-                        Spacer()
-                        Text(appState.scheduler.config.formattedLastRun)
-                            .foregroundStyle(.secondary)
-                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
         }
         .formStyle(.grouped)
+        .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85),
+                   value: appState.scheduler.config.isEnabled)
     }
 }
 

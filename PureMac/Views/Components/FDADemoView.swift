@@ -18,6 +18,7 @@ struct FDADemoView: View {
 
     @State private var frame: Frame = .idle
     @State private var isActive = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var rows: [DemoRow] {
         [
@@ -42,6 +43,13 @@ struct FDADemoView: View {
             .foregroundStyle(.secondary)
         }
         .onAppear {
+            // Reduce Motion: freeze on the end state — the user sees the
+            // "toggled on, granted" frame as a static illustration instead
+            // of an infinite loop.
+            if reduceMotion {
+                frame = .hold
+                return
+            }
             isActive = true
             cycle()
         }
@@ -130,7 +138,7 @@ struct FDADemoView: View {
     // MARK: - Cycle
 
     private func cycle() {
-        guard isActive else { return }
+        guard isActive, !reduceMotion else { return }
 
         let schedule: [(Frame, Double)] = [
             (.idle, 0.6),
