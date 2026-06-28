@@ -1,5 +1,6 @@
 # Xcode
 build/
+build-ci/
 DerivedData/
 *.xcworkspace
 !*.xcworkspace/contents.xcworkspacedata

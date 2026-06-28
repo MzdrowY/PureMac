@@ -42,6 +42,10 @@
   <a href="#contributing">Contributing</a>
 </p>
 
+<p align="center">
+  <sub>Want more open source? Try <a href="https://github.com/momenbasel/pesty"><b>Pesty</b></a> - a free, native clipboard manager for macOS.</sub>
+</p>
+
 ---
 
 ## Install
@@ -228,6 +232,22 @@ Especially welcome:
 - **[@fengcheng01](https://github.com/fengcheng01)** - App uninstaller feature request ([#28](https://github.com/momenbasel/PureMac/issues/28))
 - **[@scholzfuni](https://github.com/scholzfuni)** - Modularization proposal ([#23](https://github.com/momenbasel/PureMac/issues/23))
 - **[@Zonharo](https://github.com/Zonharo)** - In-app auto-update request ([#94](https://github.com/momenbasel/PureMac/issues/94))
+
+## Star History
+
+If PureMac saved you some disk space, a star helps other people find it.
+
+<a href="https://star-history.com/#momenbasel/PureMac&Date">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=momenbasel/PureMac&type=Date&theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=momenbasel/PureMac&type=Date" />
+    <img alt="PureMac star history chart" src="https://api.star-history.com/svg?repos=momenbasel/PureMac&type=Date" width="720" />
+  </picture>
+</a>
+
+## More open source
+
+- **[Pesty](https://github.com/momenbasel/pesty)** - a free, open-source clipboard manager for macOS. Color-coded history, pinboards, instant search, keyboard-fast paste. Signed, notarized, `brew install --cask momenbasel/pesty/pesty`.
 
 ## License
 

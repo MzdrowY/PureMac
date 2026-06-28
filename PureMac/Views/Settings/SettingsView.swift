@@ -159,9 +159,13 @@ struct GeneralSettingsView: View {
 // MARK: - Cleaning
 
 struct CleaningSettingsView: View {
+    @EnvironmentObject var appState: AppState
     @AppStorage("settings.cleaning.skipHiddenFiles") private var skipHiddenFiles = true
     @AppStorage("settings.cleaning.largeFileThreshold") private var largeFileThresholdMB: Int = 100
     @AppStorage("settings.cleaning.oldFileMonths") private var oldFileMonths: Int = 12
+
+    private static let excludedFoldersKey = "settings.cleaning.largeFileExcludedFolders"
+    @State private var excludedFolders: [String] = []
 
     var body: some View {
         Form {
@@ -182,8 +186,82 @@ struct CleaningSettingsView: View {
                     in: 1...60
                 )
             }
+
+            Section("Excluded Folders") {
+                if excludedFolders.isEmpty {
+                    Text("Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(excludedFolders, id: \.self) { folder in
+                        HStack(spacing: 8) {
+                            Image(systemName: "folder")
+                                .foregroundStyle(.secondary)
+                            Text((folder as NSString).abbreviatingWithTildeInPath)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
+                                .help(folder)
+                            Spacer()
+                            Button {
+                                removeExcludedFolder(folder)
+                            } label: {
+                                Image(systemName: "minus.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.borderless)
+                            .help(String(localized: "Remove from exclusions"))
+                        }
+                    }
+                }
+                Button("Add Folder…") { addExcludedFolder() }
+            }
+
+            Section("Orphan Finder") {
+                HStack {
+                    // Read the live count directly (it's a UserDefaults-backed
+                    // computed property on AppState) so it stays correct when
+                    // orphans are ignored from the Orphans view while this tab
+                    // is open. AppState fires objectWillChange on both ignore
+                    // (via @Published orphanedFiles) and clear, re-rendering this.
+                    Text(String(format: String(localized: "Ignored orphans: %lld"), Int64(appState.ignoredOrphanCount)))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Button("Forget Ignored") {
+                        appState.clearIgnoredOrphans()
+                    }
+                    .disabled(appState.ignoredOrphanCount == 0)
+                }
+                Text("Ignored files won't appear in future orphan scans.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .formStyle(.grouped)
+        .onAppear {
+            excludedFolders = UserDefaults.standard.stringArray(forKey: Self.excludedFoldersKey) ?? []
+        }
+    }
+
+    private func persistExcludedFolders() {
+        UserDefaults.standard.set(excludedFolders, forKey: Self.excludedFoldersKey)
+    }
+
+    private func addExcludedFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = true
+        panel.prompt = String(localized: "Add Folder…")
+        guard panel.runModal() == .OK else { return }
+        for url in panel.urls where !excludedFolders.contains(url.path) {
+            excludedFolders.append(url.path)
+        }
+        persistExcludedFolders()
+    }
+
+    private func removeExcludedFolder(_ folder: String) {
+        excludedFolders.removeAll { $0 == folder }
+        persistExcludedFolders()
     }
 }
 

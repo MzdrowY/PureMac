@@ -27,6 +27,18 @@ enum ExternalUninstallBuffer {
     static var pendingPath: String?
 }
 
+/// Standalone observable for the live scan-path ticker. The scan engine reports
+/// the filesystem path it is touching ~10×/sec. Routing that through AppState's
+/// own `@Published` storage republished the *entire* view tree at that rate,
+/// which surfaced as window-drag / button-hover lag and a Smart Scan that
+/// looked frozen until you switched sidebar sections and forced a fresh render
+/// (issues #119, #120). Isolating the high-frequency value here means only the
+/// small ticker label observes it, so the rest of the UI stays still.
+@MainActor
+final class ScanProgressTicker: ObservableObject {
+    @Published var path: String = ""
+}
+
 @MainActor
 final class AppState: ObservableObject {
     typealias AppFileScanner = @MainActor (
@@ -46,9 +58,11 @@ final class AppState: ObservableObject {
     @Published var scanProgress: Double = 0
     @Published var cleanProgress: Double = 0
     @Published var currentScanCategory: String = ""
-    /// Last filesystem path the scan engine touched — feeds the dashboard's
-    /// live ticker. Throttled at the engine side (~10Hz).
-    @Published var currentScanPath: String = ""
+    /// Live filesystem path the scan engine is touching, feeding the dashboard's
+    /// ticker. Deliberately NOT a `@Published` on AppState — it updates ~10×/sec
+    /// and would otherwise invalidate the whole view tree (issues #119, #120).
+    /// Only the ticker label observes this object directly.
+    let scanTicker = ScanProgressTicker()
     @Published var showCleanConfirmation = false
     @Published var lastCleanedDate: Date?
     @Published var selectedCleanupItems: Set<UUID> = []
@@ -501,6 +515,10 @@ final class AppState: ObservableObject {
             let knownApps = await MainActor.run { self.installedApps }
             let knownIDs = Set(knownApps.map { $0.bundleIdentifier.normalizedForMatching() })
             let knownNames = Set(knownApps.map { $0.appName.normalizedForMatching() })
+            // Paths the user marked "Always Ignore" (issue #114). These were
+            // false positives for them, so they stay hidden from every scan
+            // until the user forgets the list in Settings.
+            let ignored = Set(UserDefaults.standard.stringArray(forKey: Self.ignoredOrphansKey) ?? [])
 
             var orphans: [URL] = []
             let fm = FileManager.default
@@ -519,6 +537,7 @@ final class AppState: ObservableObject {
 
                     if !belongsToApp {
                         let fullPath = URL(fileURLWithPath: path).appendingPathComponent(item)
+                        if ignored.contains(fullPath.path) { continue }
                         if OrphanSafetyPolicy.isSafeCandidate(fullPath) {
                             orphans.append(fullPath)
                         }
@@ -532,6 +551,41 @@ final class AppState: ObservableObject {
                 self?.isSearchingOrphans = false
             }
         }
+    }
+
+    // MARK: - Orphan ignore list (#114)
+
+    static let ignoredOrphansKey = "settings.orphans.ignored"
+
+    /// Number of paths currently on the "always ignore" list. Read from
+    /// UserDefaults each access so the Settings row tracks live changes.
+    var ignoredOrphanCount: Int {
+        UserDefaults.standard.stringArray(forKey: Self.ignoredOrphansKey)?.count ?? 0
+    }
+
+    /// Permanently hide the given orphans from future scans and sweep them out
+    /// of the current results.
+    func ignoreOrphans(_ urls: [URL]) {
+        guard !urls.isEmpty else { return }
+        var ignored = Set(UserDefaults.standard.stringArray(forKey: Self.ignoredOrphansKey) ?? [])
+        for url in urls { ignored.insert(url.path) }
+        UserDefaults.standard.set(Array(ignored), forKey: Self.ignoredOrphansKey)
+
+        let urlSet = Set(urls)
+        if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+            orphanedFiles.removeAll { urlSet.contains($0) }
+        } else {
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                orphanedFiles.removeAll { urlSet.contains($0) }
+            }
+        }
+        Logger.shared.log("Ignoring \(urls.count) orphan(s) in future scans", level: .info)
+    }
+
+    /// Forget every ignored path so they can surface again on the next scan.
+    func clearIgnoredOrphans() {
+        UserDefaults.standard.removeObject(forKey: Self.ignoredOrphansKey)
+        objectWillChange.send()
     }
 
     // MARK: - Selection
@@ -765,7 +819,7 @@ final class AppState: ObservableObject {
 
                 let result = await scanEngine.scanCategory(category) { [weak self] path in
                     Task { @MainActor [weak self] in
-                        self?.currentScanPath = path
+                        self?.scanTicker.path = path
                     }
                 }
                 categoryResults[category] = result
@@ -773,7 +827,7 @@ final class AppState: ObservableObject {
             }
 
             scanProgress = 1.0
-            currentScanPath = ""
+            scanTicker.path = ""
             scanState = .completed
             loadDiskInfo()
         }
@@ -790,14 +844,14 @@ final class AppState: ObservableObject {
             clearSelectionState(for: category)
             let result = await scanEngine.scanCategory(category) { [weak self] path in
                 Task { @MainActor [weak self] in
-                    self?.currentScanPath = path
+                    self?.scanTicker.path = path
                 }
             }
             categoryResults[category] = result
 
             totalJunkSize = categoryResults.values.reduce(0) { $0 + $1.totalSize }
             scanProgress = 1.0
-            currentScanPath = ""
+            scanTicker.path = ""
             scanState = .completed
         }
     }

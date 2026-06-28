@@ -351,3 +351,16 @@
 /* v2.8.1: purgeable honesty */
 "Managed by macOS" = "macOS が管理";
 "Reserved by macOS - freed automatically when space is needed" = "macOS が予約 - 空き容量が必要になると自動的に解放されます";
+
+/* v2.8.2: large-file folder exclusions (#121) */
+"Excluded Folders" = "除外するフォルダ";
+"Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop)." = "これらのフォルダ内のファイルは「大きい/古いファイル」スキャン（ダウンロード、書類、デスクトップ）でスキップされます。";
+"Remove from exclusions" = "除外から削除";
+"Add Folder…" = "フォルダを追加…";
+
+/* v2.8.2: orphan ignore list (#114) */
+"Always Ignore" = "常に無視";
+"Ignore Selected (%lld)" = "選択した項目を無視 (%lld)";
+"Ignored orphans: %lld" = "無視した孤立ファイル: %lld";
+"Forget Ignored" = "無視リストを消去";
+"Ignored files won't appear in future orphan scans." = "無視したファイルは今後の孤立ファイルのスキャンに表示されません。";

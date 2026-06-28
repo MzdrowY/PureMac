@@ -15,7 +15,7 @@ actor ScanEngine {
     private func report(_ path: @autoclosure () -> String) {
         guard let onPath else { return }
         let now = Date()
-        guard now.timeIntervalSince(lastReport) > 0.08 else { return }
+        guard now.timeIntervalSince(lastReport) > 0.1 else { return }
         lastReport = now
         onPath(path())
     }
@@ -253,8 +253,36 @@ actor ScanEngine {
 
     private func scanLargeFiles() -> CategoryResult {
         var items: [CleanableItem] = []
-        let minSize: Int64 = 100 * 1024 * 1024 // 100 MB
-        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: Date())!
+
+        // Honor the thresholds the user set in Settings → Cleaning. These keys
+        // were previously surfaced in the UI but never read here, so the sliders
+        // did nothing; defaults match the old hardcoded 100 MB / 12-month values.
+        let defaults = UserDefaults.standard
+        let thresholdMB = defaults.object(forKey: "settings.cleaning.largeFileThreshold") as? Int ?? 100
+        let oldFileMonths = defaults.object(forKey: "settings.cleaning.oldFileMonths") as? Int ?? 12
+        let minSize = Int64(max(1, thresholdMB)) * 1024 * 1024
+        let oldCutoff = Calendar.current.date(byAdding: .month, value: -max(1, oldFileMonths), to: Date())
+            ?? Date.distantPast
+
+        // Folders the user excluded from the large-file scan (issue #121) —
+        // e.g. VM images, media libraries, project assets they never want
+        // surfaced. Files anywhere inside an excluded folder are skipped, and
+        // the directory subtree is pruned so we don't even walk it.
+        let excludedFolders = (defaults.stringArray(forKey: "settings.cleaning.largeFileExcludedFolders") ?? [])
+            .map(normalizePath)
+            .filter { !$0.isEmpty }
+
+        // Honor the "Skip hidden files during scan" toggle, which was a dead
+        // control until now (no scanner read it). Default true preserves the
+        // previous always-skip behavior.
+        let skipHidden = defaults.object(forKey: "settings.cleaning.skipHiddenFiles") as? Bool ?? true
+        var enumerationOptions: FileManager.DirectoryEnumerationOptions = [.skipsPackageDescendants]
+        if skipHidden { enumerationOptions.insert(.skipsHiddenFiles) }
+
+        func isExcluded(_ path: String) -> Bool {
+            let normalized = normalizePath(path)
+            return excludedFolders.contains { normalized == $0 || normalized.hasPrefix($0 + "/") }
+        }
 
         let searchPaths = [
             "\(home)/Downloads",
@@ -266,7 +294,7 @@ actor ScanEngine {
             guard let enumerator = fileManager.enumerator(
                 at: URL(fileURLWithPath: basePath),
                 includingPropertiesForKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey],
-                options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                options: enumerationOptions
             ) else { continue }
 
             // No entry cap. A 5k cap was here previously and meant any user
@@ -274,6 +302,13 @@ actor ScanEngine {
             // checkouts) would never see anything past entry 5k — the
             // scattered 100+ MB files were always past that bound.
             for case let fileURL as URL in enumerator {
+                // Prune excluded subtrees: hitting the excluded directory itself
+                // skips its whole contents; for files the call is a harmless no-op.
+                // Skip the path normalization entirely when nothing is excluded.
+                if !excludedFolders.isEmpty, isExcluded(fileURL.path) {
+                    enumerator.skipDescendants()
+                    continue
+                }
                 report(fileURL.path)
                 guard let resourceValues = try? fileURL.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey, .isRegularFileKey]),
                       let isFile = resourceValues.isRegularFile, isFile,
@@ -283,7 +318,7 @@ actor ScanEngine {
                 let size = Int64(fileSize)
                 let modDate = resourceValues.contentModificationDate
 
-                if size > minSize || (modDate != nil && modDate! < oneYearAgo && size > 10 * 1024 * 1024) {
+                if size > minSize || (modDate != nil && modDate! < oldCutoff && size > 10 * 1024 * 1024) {
                     items.append(CleanableItem(
                         name: fileURL.lastPathComponent,
                         path: fileURL.path,

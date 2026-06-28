@@ -351,3 +351,16 @@
 /* v2.8.1: purgeable honesty */
 "Managed by macOS" = "由 macOS 管理";
 "Reserved by macOS - freed automatically when space is needed" = "由 macOS 保留 - 需要空間時自動釋放";
+
+/* v2.8.2: large-file folder exclusions (#121) */
+"Excluded Folders" = "排除的資料夾";
+"Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop)." = "這些資料夾中的檔案會在「大型與舊檔案」掃描（下載、文件、桌面）中被略過。";
+"Remove from exclusions" = "從排除項目中移除";
+"Add Folder…" = "加入資料夾…";
+
+/* v2.8.2: orphan ignore list (#114) */
+"Always Ignore" = "永遠忽略";
+"Ignore Selected (%lld)" = "忽略所選 (%lld)";
+"Ignored orphans: %lld" = "已忽略的孤立檔案：%lld";
+"Forget Ignored" = "清除已忽略";
+"Ignored files won't appear in future orphan scans." = "已忽略的檔案不會出現在日後的孤立檔案掃描中。";

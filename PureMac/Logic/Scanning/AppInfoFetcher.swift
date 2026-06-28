@@ -45,13 +45,23 @@ final class AppInfoFetcher {
         var apps: [InstalledApp] = []
         var seenBundleIDs: Set<String> = []
 
-        let searchPaths = [
-            "/Applications",
-            "\(home)/Applications",
-            "/System/Applications",
+        // `/Users/Shared` is where game launchers (Riot Client, some Blizzard
+        // and Epic helpers) drop their `.app` bundles instead of /Applications,
+        // so it has to be scanned for those to show up in the uninstaller
+        // (issue #123). It can also hold multi-gigabyte game data trees, so it
+        // is depth-bounded — the launcher bundles live within the first few
+        // levels (e.g. /Users/Shared/Riot Games/Riot Client.app at depth 2);
+        // the bound is kept generous (6) so a vendor that nests one or two
+        // directories deeper is still found, while the multi-gigabyte asset
+        // trees below that are not walked.
+        let searchRoots: [(path: String, maxDepth: Int)] = [
+            ("/Applications", 8),
+            ("\(home)/Applications", 8),
+            ("/System/Applications", 8),
+            ("/Users/Shared", 6),
         ]
 
-        for searchPath in searchPaths {
+        for (searchPath, maxDepth) in searchRoots {
             guard let enumerator = fileManager.enumerator(
                 at: URL(fileURLWithPath: searchPath),
                 includingPropertiesForKeys: [.isDirectoryKey],
@@ -59,7 +69,14 @@ final class AppInfoFetcher {
             ) else { continue }
 
             for case let url as URL in enumerator {
-                guard url.pathExtension == "app" else { continue }
+                guard url.pathExtension == "app" else {
+                    // Stop descending once past the depth bound so a deep data
+                    // tree (e.g. a game's assets) doesn't get fully walked.
+                    if enumerator.level >= maxDepth {
+                        enumerator.skipDescendants()
+                    }
+                    continue
+                }
 
                 // Skip subdirectories inside .app bundles
                 enumerator.skipDescendants()

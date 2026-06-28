@@ -451,26 +451,15 @@ struct DashboardView: View {
                         .padding(.top, 2)
 
                     // Live file-path ticker — the "it's really working"
-                    // signal. Fixed height so rapid path swaps don't bounce
-                    // the layout.
-                    Text(tickerPath)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(.tertiary)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .frame(maxWidth: 360, alignment: .leading)
-                        .frame(height: 14)
-                        .opacity(tickerPath.isEmpty ? 0 : 1)
+                    // signal. Observes the standalone ScanProgressTicker so the
+                    // ~10Hz path churn re-renders only this label, not the whole
+                    // dashboard (issues #119, #120).
+                    ScanPathTicker(ticker: appState.scanTicker)
                 }
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: appState.currentScanCategory)
                 Spacer(minLength: 0)
             }
         }
-    }
-
-    private var tickerPath: String {
-        guard !appState.currentScanPath.isEmpty else { return "" }
-        return (appState.currentScanPath as NSString).abbreviatingWithTildeInPath
     }
 
     private var currentlyInText: String {
@@ -767,6 +756,29 @@ private struct SuggestionRow: View {
             }
         }
         .pressable(hoverScale: 1.01, lift: true)
+    }
+}
+
+/// Live file-path ticker. Observes the standalone `ScanProgressTicker` directly
+/// so the scan engine's ~10Hz path updates re-render only this one label rather
+/// than the whole AppState-observing view tree (issues #119, #120).
+private struct ScanPathTicker: View {
+    @ObservedObject var ticker: ScanProgressTicker
+
+    private var display: String {
+        guard !ticker.path.isEmpty else { return "" }
+        return (ticker.path as NSString).abbreviatingWithTildeInPath
+    }
+
+    var body: some View {
+        Text(display)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.tertiary)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .frame(maxWidth: 360, alignment: .leading)
+            .frame(height: 14)
+            .opacity(display.isEmpty ? 0 : 1)
     }
 }
 

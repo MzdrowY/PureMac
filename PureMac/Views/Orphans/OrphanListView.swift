@@ -33,6 +33,7 @@ struct OrphanListView: View {
                                 NSPasteboard.general.clearContents()
                                 NSPasteboard.general.setString(fileURL.path, forType: .string)
                             },
+                            onIgnore: { ignoreOrphans([fileURL]) },
                             onTrash: { Task { await removeSingleOrphan(fileURL) } }
                         )
                         .transition(
@@ -65,6 +66,11 @@ struct OrphanListView: View {
                 }
 
                 if !selectedOrphans.isEmpty {
+                    Button(ignoreSelectedLabel) {
+                        ignoreOrphans(Array(selectedOrphans))
+                    }
+                    .disabled(isRemoving)
+
                     Button(removeSelectedLabel, role: .destructive) {
                         Task {
                             await removeSelectedOrphans()
@@ -92,6 +98,17 @@ struct OrphanListView: View {
 
     private var removeSelectedLabel: String {
         String(format: String(localized: "Remove Selected (%lld)"), Int64(selectedOrphans.count))
+    }
+
+    private var ignoreSelectedLabel: String {
+        String(format: String(localized: "Ignore Selected (%lld)"), Int64(selectedOrphans.count))
+    }
+
+    /// Persist the given URLs to the ignore list (so future scans skip them)
+    /// and drop them from the local selection.
+    private func ignoreOrphans(_ urls: [URL]) {
+        appState.ignoreOrphans(urls)
+        selectedOrphans.subtract(urls)
     }
 
     private func orphanBinding(for url: URL) -> Binding<Bool> {
@@ -272,6 +289,7 @@ private struct OrphanRowView: View {
     let fileSize: Int64?
     let onReveal: () -> Void
     let onCopyPath: () -> Void
+    let onIgnore: () -> Void
     let onTrash: () -> Void
 
     @State private var hovering = false
@@ -316,6 +334,7 @@ private struct OrphanRowView: View {
             Button("Reveal in Finder") { onReveal() }
             Button("Copy Path") { onCopyPath() }
             Divider()
+            Button("Always Ignore") { onIgnore() }
             Button("Move to Trash", role: .destructive) { onTrash() }
         }
     }

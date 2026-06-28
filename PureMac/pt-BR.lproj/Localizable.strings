@@ -351,3 +351,16 @@
 /* v2.8.1: purgeable honesty */
 "Managed by macOS" = "Gerenciado pelo macOS";
 "Reserved by macOS - freed automatically when space is needed" = "Reservado pelo macOS - liberado automaticamente quando há necessidade de espaço";
+
+/* v2.8.2: large-file folder exclusions (#121) */
+"Excluded Folders" = "Pastas excluídas";
+"Files inside these folders are skipped from the Large & Old Files scan (Downloads, Documents, Desktop)." = "Arquivos dentro destas pastas são ignorados na verificação de Arquivos Grandes e Antigos (Downloads, Documentos, Mesa).";
+"Remove from exclusions" = "Remover das exclusões";
+"Add Folder…" = "Adicionar pasta…";
+
+/* v2.8.2: orphan ignore list (#114) */
+"Always Ignore" = "Ignorar sempre";
+"Ignore Selected (%lld)" = "Ignorar selecionados (%lld)";
+"Ignored orphans: %lld" = "Órfãos ignorados: %lld";
+"Forget Ignored" = "Esquecer ignorados";
+"Ignored files won't appear in future orphan scans." = "Arquivos ignorados não aparecerão em futuras verificações de órfãos.";
