@@ -133,31 +133,6 @@ final class AppInfoFetcher {
     }
 
     private func appSize(at url: URL) -> Int64 {
-        // totalFileAllocatedSizeKey on a directory URL returns only the
-        // directory inode (~4 KB on APFS), not the recursive sum - the
-        // previous fast-path returned that and exited, causing app sizes
-        // to display as ~4 KB regardless of bundle contents. Always
-        // enumerate the bundle contents and sum.
-        guard let enumerator = fileManager.enumerator(
-            at: url,
-            includingPropertiesForKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey, .isSymbolicLinkKey],
-            options: [.skipsHiddenFiles]
-        ) else { return 0 }
-
-        var total: Int64 = 0
-        for case let fileURL as URL in enumerator {
-            guard let values = try? fileURL.resourceValues(forKeys: [.totalFileAllocatedSizeKey, .fileAllocatedSizeKey, .isRegularFileKey, .isSymbolicLinkKey]) else { continue }
-            // Skip symlinks so we don't double-count or follow links out of
-            // the bundle. Skip directories so we only count regular file
-            // payload.
-            if values.isSymbolicLink == true { continue }
-            guard values.isRegularFile == true else { continue }
-            if let allocated = values.totalFileAllocatedSize {
-                total += Int64(allocated)
-            } else if let allocated = values.fileAllocatedSize {
-                total += Int64(allocated)
-            }
-        }
-        return total
+        FileSizeCalculator.size(of: url) ?? 0
     }
 }
